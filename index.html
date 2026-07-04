@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="Style.css">
 </head>
 <body>
 
@@ -743,7 +743,19 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script src="script.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js" onerror="this.dataset.failed='1'"></script>
+<script>
+  // If the primary CDN was blocked or unreachable, try a second CDN before
+  // giving up. This only runs if the first <script> tag above failed to load.
+  (function ensureChartJs() {
+    if (typeof Chart !== "undefined") return;
+    var fallback = document.createElement("script");
+    fallback.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js";
+    fallback.onload = function () { window.dispatchEvent(new Event("chartjs-ready")); };
+    fallback.onerror = function () { console.error("[Vitalis] Chart.js failed to load from both CDNs — check your internet connection."); };
+    document.head.appendChild(fallback);
+  })();
+</script>
+<script src="Script.js"></script>
 </body>
 </html>
