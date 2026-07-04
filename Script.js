@@ -235,15 +235,25 @@ function initChartDefaults() {
 }
 
 function buildAllCharts() {
-  buildFeatureImportanceChart();
-  buildCostDistributionChart();
-  buildActualPredictedChart();
-  buildRiskRadarChart();
-  buildHealthPolarChart();
-  buildLifestylePieChart();
-  buildRegionDoughnutChart();
-  buildPremiumTrendChart();
-  buildRiskGaugeChart();
+  const builders = [
+    ["Feature Importance", buildFeatureImportanceChart],
+    ["Cost Distribution", buildCostDistributionChart],
+    ["Actual vs Predicted", buildActualPredictedChart],
+    ["Risk Radar", buildRiskRadarChart],
+    ["Health Polar", buildHealthPolarChart],
+    ["Lifestyle Pie", buildLifestylePieChart],
+    ["Region Doughnut", buildRegionDoughnutChart],
+    ["Premium Trend", buildPremiumTrendChart],
+    ["Risk Gauge", buildRiskGaugeChart]
+  ];
+
+  builders.forEach(([name, fn]) => {
+    try {
+      fn();
+    } catch (err) {
+      console.error(`[Vitalis] Chart failed to build: ${name}`, err);
+    }
+  });
 }
 
 function buildFeatureImportanceChart() {
@@ -304,6 +314,7 @@ function buildActualPredictedChart() {
   });
   const maxVal = 30000;
   charts.actualPredicted = new Chart(ctx, {
+    type: "scatter",
     data: {
       datasets: [
         {
@@ -475,7 +486,7 @@ function buildRiskGaugeChart() {
     afterDraw(chart) {
       if (chart.canvas.id !== "chart-risk-gauge") return;
       const { ctx, chartArea } = chart;
-      const value = chart.config._gaugeValue ?? 0;
+      const value = chart._gaugeValue ?? 0;
       const cx = (chartArea.left + chartArea.right) / 2;
       const cy = chartArea.bottom - 4;
       ctx.save();
@@ -508,7 +519,7 @@ function buildRiskGaugeChart() {
     },
     plugins: [gaugeCenterText]
   });
-  charts.riskGauge.config._gaugeValue = 0;
+  charts.riskGauge._gaugeValue = 0;
 }
 
 function updateGauge(value) {
@@ -517,7 +528,7 @@ function updateGauge(value) {
   const gauge = charts.riskGauge;
   gauge.data.datasets[0].data = [clamped, 100 - clamped];
   gauge.data.datasets[0].backgroundColor = [color, "rgba(255,255,255,0.07)"];
-  gauge.config._gaugeValue = clamped;
+  gauge._gaugeValue = clamped;
   gauge.update();
 }
 
