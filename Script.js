@@ -542,6 +542,8 @@ function normalize(value, max) {
 }
 
 function updateLiveCharts(payload) {
+  if (!chartsReady) return; // Charts never loaded — skip silently, prediction still shows.
+
   // Risk radar: Age, BMI, Risk Score, Chronic Count, Hospital Visits, Hospital Days
   charts.riskRadar.data.datasets[0].data = [
     normalize(payload.age, 100),
@@ -639,7 +641,11 @@ form.addEventListener("submit", async (event) => {
     confidenceLabel.textContent = `±${(100 - confidencePct + 4)}% estimated variance`;
 
     animateResultEcg(Math.min(cost / 25000, 1));
-    updateLiveCharts(payload);
+    try {
+      updateLiveCharts(payload);
+    } catch (chartErr) {
+      console.error("[Vitalis] Live chart update failed (prediction still valid):", chartErr);
+    }
 
     session.count += 1;
     session.total += cost;
@@ -661,10 +667,34 @@ form.addEventListener("submit", async (event) => {
 /* ---------------------------------------------------------
    Init
 --------------------------------------------------------- */
+let chartsReady = false;
+
+function showChartsUnavailableNotice() {
+  document.querySelectorAll(".chart-canvas-wrap").forEach((wrap) => {
+    if (wrap.querySelector(".chart-fallback-note")) return;
+    const note = document.createElement("p");
+    note.className = "chart-fallback-note";
+    note.style.cssText = "color:#5B6478;font-size:0.8rem;text-align:center;padding-top:40px;font-family:'JetBrains Mono',monospace;";
+    note.textContent = "Chart library unavailable — check your internet connection and refresh.";
+    wrap.appendChild(note);
+  });
+}
+
+function tryInitCharts() {
+  if (chartsReady || typeof Chart === "undefined") return false;
+  initChartDefaults();
+  buildAllCharts();
+  chartsReady = true;
+  return true;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   refreshSessionStats();
-  if (typeof Chart !== "undefined") {
-    initChartDefaults();
-    buildAllCharts();
+  if (!tryInitCharts()) {
+    // Give the fallback CDN (loaded async in index.html) a moment to arrive.
+    window.addEventListener("chartjs-ready", () => tryInitCharts());
+    setTimeout(() => {
+      if (!tryInitCharts()) showChartsUnavailableNotice();
+    }, 3000);
   }
 });
