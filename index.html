@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vitalis &mdash; Medical Cost Intelligence</title>
+<title>Vitalis &mdash; Medical Cost Intelligence Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,11 +15,21 @@
   <div class="grid-overlay"></div>
   <div class="glow glow-a"></div>
   <div class="glow glow-b"></div>
+  <div class="glow glow-c"></div>
 </div>
 
-<header class="navbar">
-  <div class="nav-inner">
-    <div class="brand">
+<button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle navigation">
+  <span></span><span></span><span></span>
+</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+<div class="app-shell">
+
+  <!-- ============================================================
+       SIDEBAR
+  ============================================================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
       <svg class="brand-mark" viewBox="0 0 40 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M0 12H9L12 3L17 21L21 9L24 15L27 12H40" stroke="url(#navGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         <defs>
@@ -31,437 +41,709 @@
       </svg>
       <span class="brand-name">Vitalis<span class="brand-dot">.</span></span>
     </div>
-    <nav class="nav-links">
-      <a href="#assessment">Assessment</a>
-      <a href="#result">Result</a>
-    </nav>
-    <div class="nav-status">
-      <span class="status-dot"></span>
-      Model online &middot; CatBoost v2
-    </div>
-  </div>
-</header>
 
-<main>
-
-  <section class="hero">
-    <div class="hero-inner">
-      <p class="eyebrow">Predictive Underwriting Engine</p>
-      <h1>Know the cost of care<br><span class="grad-text">before it happens.</span></h1>
-      <p class="hero-sub">Vitalis reads 48 clinical, behavioral and policy signals and returns a projected annual medical cost in real time &mdash; powered by a CatBoost regression model trained on longitudinal claims data.</p>
-      <a href="#assessment" class="btn btn-primary">
-        Begin Patient Assessment
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <nav class="sidebar-nav">
+      <p class="sidebar-group-label">Console</p>
+      <a href="#dashboard" class="sidebar-link" data-target="dashboard">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="12" width="7" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="16" width="7" height="5" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span>Dashboard</span>
       </a>
+      <a href="#prediction" class="sidebar-link" data-target="prediction">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12H7L9.5 5L14 19L16.5 12H21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Prediction</span>
+      </a>
+      <a href="#analytics" class="sidebar-link" data-target="analytics">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 20V10M11 20V4M18 20V14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Analytics</span>
+      </a>
+      <a href="#model-info" class="sidebar-link" data-target="model-info">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2V5M12 19V22M2 12H5M19 12H22M4.5 4.5L6.5 6.5M17.5 17.5L19.5 19.5M4.5 19.5L6.5 17.5M17.5 6.5L19.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <span>Model Info</span>
+      </a>
+      <a href="#about" class="sidebar-link" data-target="about">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11V16.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="7.7" r="0.9" fill="currentColor"/></svg>
+        <span>About</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="session-mini">
+        <p class="session-mini-label">Session</p>
+        <div class="session-mini-row">
+          <span>Predictions</span>
+          <strong id="mini-count">0</strong>
+        </div>
+        <div class="session-mini-row">
+          <span>Avg. Cost</span>
+          <strong id="mini-avg">$0</strong>
+        </div>
+      </div>
+      <div class="model-badge">
+        <span class="model-badge-dot"></span>
+        CatBoostRegressor &middot; Online
+      </div>
     </div>
-    <div class="ecg-wrap" aria-hidden="true">
-      <svg class="ecg-svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-        <path class="ecg-line" d="M0 60 L140 60 L165 60 L180 20 L200 100 L220 10 L240 90 L260 60 L340 60 L365 60 L380 20 L400 100 L420 10 L440 90 L460 60 L540 60 L565 60 L580 20 L600 100 L620 10 L640 90 L660 60 L740 60 L765 60 L780 20 L800 100 L820 10 L840 90 L860 60 L940 60 L965 60 L980 20 L1000 100 L1020 10 L1040 90 L1060 60 L1200 60"
-          fill="none" stroke="url(#ecgGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <defs>
-          <linearGradient id="ecgGrad" x1="0" y1="0" x2="1200" y2="0">
-            <stop offset="0%" stop-color="#00E5C7" stop-opacity="0"/>
-            <stop offset="15%" stop-color="#00E5C7"/>
-            <stop offset="50%" stop-color="#7C8CFF"/>
-            <stop offset="85%" stop-color="#00E5C7"/>
-            <stop offset="100%" stop-color="#00E5C7" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  </section>
+  </aside>
 
-  <form id="predict-form" novalidate>
+  <!-- ============================================================
+       MAIN
+  ============================================================= -->
+  <div class="main-wrap">
 
-    <section class="assessment" id="assessment">
-      <div class="section-head">
-        <p class="eyebrow">01 &mdash; Intake</p>
-        <h2>Patient Assessment</h2>
-        <p class="section-sub">Complete every field. All values are sent exactly as entered to the prediction service.</p>
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-crumb">Vitalis</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" class="crumb-chevron"><path d="M9 5L15 12L9 19" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="topbar-crumb topbar-crumb-active" id="topbar-crumb-active">Dashboard</span>
       </div>
+      <nav class="topbar-links">
+        <a href="#dashboard">Overview</a>
+        <a href="#prediction">Prediction</a>
+        <a href="#analytics">Analytics</a>
+        <a href="#model-info">Docs</a>
+      </nav>
+      <div class="topbar-right">
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          API Connected
+        </div>
+        <div class="avatar" title="Ayush Palse">AP</div>
+      </div>
+    </header>
 
-      <div class="card-grid">
+    <main>
 
-        <!-- DEMOGRAPHICS -->
-        <div class="panel">
-          <div class="panel-head">
-            <span class="panel-icon">◐</span>
+      <!-- ============================================================
+           DASHBOARD / HERO
+      ============================================================= -->
+      <section id="dashboard" class="hero">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Predictive Underwriting Engine</p>
+            <h1>AI&#8209;Powered Medical<br><span class="grad-text">Insurance Cost Prediction.</span></h1>
+            <p class="hero-sub">Vitalis reads 48 clinical, behavioral and policy signals and returns a projected annual medical cost in real time &mdash; powered by a CatBoost regression model served over FastAPI.</p>
+            <div class="hero-actions">
+              <a href="#prediction" class="btn btn-primary">
+                Run New Assessment
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </a>
+              <a href="#analytics" class="btn btn-ghost">View Analytics</a>
+            </div>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="orbit-illustration">
+              <svg viewBox="0 0 360 360" class="orbit-svg">
+                <circle cx="180" cy="180" r="120" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                <circle cx="180" cy="180" r="80" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+                <circle cx="180" cy="180" r="150" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                <line x1="60" y1="180" x2="300" y2="180" stroke="rgba(0,229,199,0.15)" stroke-width="1"/>
+                <line x1="180" y1="60" x2="180" y2="300" stroke="rgba(124,140,255,0.15)" stroke-width="1"/>
+              </svg>
+              <div class="orbit-node node-center">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M20.8 4.6C19.4 3.2 17.3 3 15.8 4.2L12 7.3L8.2 4.2C6.7 3 4.6 3.2 3.2 4.6C1.7 6.2 1.7 8.7 3.2 10.3L12 19.5L20.8 10.3C22.3 8.7 22.3 6.2 20.8 4.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="orbit-node node-1"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12H7L9.5 5L14 19L16.5 12H21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div class="orbit-node node-2"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 7V5C8 3.9 8.9 3 10 3H14C15.1 3 16 3.9 16 5V7" stroke="currentColor" stroke-width="1.6"/></svg></div>
+              <div class="orbit-node node-3"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/><path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              <div class="orbit-node node-4"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21C12 21 4 15.5 4 9.5C4 6.5 6.3 4.5 9 4.5C10.4 4.5 11.4 5.2 12 6C12.6 5.2 13.6 4.5 15 4.5C17.7 4.5 20 6.5 20 9.5C20 15.5 12 21 12 21Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+              <div class="orbit-badge">
+                <span class="orbit-badge-value" id="orbit-latency">18ms</span>
+                <span class="orbit-badge-label">Inference</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ecg-wrap" aria-hidden="true">
+          <svg class="ecg-svg" viewBox="0 0 1200 90" preserveAspectRatio="none">
+            <path class="ecg-line" d="M0 45 L140 45 L165 45 L180 15 L200 75 L220 8 L240 68 L260 45 L340 45 L365 45 L380 15 L400 75 L420 8 L440 68 L460 45 L540 45 L565 45 L580 15 L600 75 L620 8 L640 68 L660 45 L740 45 L765 45 L780 15 L800 75 L820 8 L840 68 L860 45 L940 45 L965 45 L980 15 L1000 75 L1020 8 L1040 68 L1060 45 L1200 45"
+              fill="none" stroke="url(#ecgGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="ecgGrad" x1="0" y1="0" x2="1200" y2="0">
+                <stop offset="0%" stop-color="#00E5C7" stop-opacity="0"/>
+                <stop offset="15%" stop-color="#00E5C7"/>
+                <stop offset="50%" stop-color="#7C8CFF"/>
+                <stop offset="85%" stop-color="#00E5C7"/>
+                <stop offset="100%" stop-color="#00E5C7" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12H7L9.5 5L14 19L16.5 12H21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <div>
-              <h3>Demographics</h3>
-              <p>Who the patient is</p>
+              <p class="kpi-label">Session Predictions</p>
+              <p class="kpi-value" id="kpi-count">0</p>
             </div>
           </div>
-          <div class="field-grid">
-            <div class="field">
-              <label for="age">Age</label>
-              <input type="number" id="age" name="age" min="0" max="120" step="1" placeholder="42" required>
-            </div>
-            <div class="field">
-              <label for="sex">Sex</label>
-              <select id="sex" name="sex" required>
-                <option value="" disabled selected>Select</option>
-                <option>Female</option>
-                <option>Male</option>
-                <option>Other</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="region">Region</label>
-              <select id="region" name="region" required>
-                <option value="" disabled selected>Select</option>
-                <option>Central</option>
-                <option>East</option>
-                <option>North</option>
-                <option>South</option>
-                <option>West</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="urban_rural">Urban / Rural</label>
-              <select id="urban_rural" name="urban_rural" required>
-                <option value="" disabled selected>Select</option>
-                <option>Rural</option>
-                <option>Suburban</option>
-                <option>Urban</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="income">Annual Income (USD)</label>
-              <input type="number" id="income" name="income" min="0" step="100" placeholder="65000" required>
-            </div>
-            <div class="field">
-              <label for="education">Education</label>
-              <select id="education" name="education" required>
-                <option value="" disabled selected>Select</option>
-                <option>Bachelors</option>
-                <option>Doctorate</option>
-                <option>HS</option>
-                <option>Masters</option>
-                <option>No HS</option>
-                <option>Some College</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="marital_status">Marital Status</label>
-              <select id="marital_status" name="marital_status" required>
-                <option value="" disabled selected>Select</option>
-                <option>Divorced</option>
-                <option>Married</option>
-                <option>Single</option>
-                <option>Widowed</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="employment_status">Employment Status</label>
-              <select id="employment_status" name="employment_status" required>
-                <option value="" disabled selected>Select</option>
-                <option>Employed</option>
-                <option>Retired</option>
-                <option>Self-employed</option>
-                <option>Unemployed</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="household_size">Household Size</label>
-              <input type="number" id="household_size" name="household_size" min="1" step="1" placeholder="3" required>
-            </div>
-            <div class="field">
-              <label for="dependents">Dependents</label>
-              <input type="number" id="dependents" name="dependents" min="0" step="1" placeholder="1" required>
-            </div>
-          </div>
-        </div>
-
-        <!-- HEALTH METRICS -->
-        <div class="panel">
-          <div class="panel-head">
-            <span class="panel-icon">✚</span>
+          <div class="kpi-card">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3V21M17 7.5C17 5.6 14.8 4 12 4C9.2 4 7 5.6 7 7.5C7 9.4 9.2 10.5 12 10.5C14.8 10.5 17 11.9 17 13.8C17 15.7 14.8 17 12 17C9.2 17 7 15.4 7 13.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
             <div>
-              <h3>Health Metrics</h3>
-              <p>Clinical vitals &amp; utilization</p>
+              <p class="kpi-label">Avg. Predicted Cost</p>
+              <p class="kpi-value" id="kpi-avg">&mdash;</p>
             </div>
           </div>
-          <div class="field-grid">
-            <div class="field">
-              <label for="bmi">BMI</label>
-              <input type="number" id="bmi" name="bmi" min="0" step="0.1" placeholder="24.5" required>
-            </div>
-            <div class="field">
-              <label for="smoker">Smoker</label>
-              <select id="smoker" name="smoker" required>
-                <option value="" disabled selected>Select</option>
-                <option>Current</option>
-                <option>Former</option>
-                <option>Never</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="alcohol_freq">Alcohol Frequency</label>
-              <select id="alcohol_freq" name="alcohol_freq" required>
-                <option value="" disabled selected>Select</option>
-                <option>Daily</option>
-                <option>Occasional</option>
-                <option>Weekly</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="visits_last_year">Visits, Last Year</label>
-              <input type="number" id="visits_last_year" name="visits_last_year" min="0" step="1" placeholder="4" required>
-            </div>
-            <div class="field">
-              <label for="hospitalizations_last_3yrs">Hospitalizations, 3yr</label>
-              <input type="number" id="hospitalizations_last_3yrs" name="hospitalizations_last_3yrs" min="0" step="1" placeholder="0" required>
-            </div>
-            <div class="field">
-              <label for="days_hospitalized_last_3yrs">Days Hospitalized, 3yr</label>
-              <input type="number" id="days_hospitalized_last_3yrs" name="days_hospitalized_last_3yrs" min="0" step="1" placeholder="0" required>
-            </div>
-            <div class="field">
-              <label for="medication_count">Medication Count</label>
-              <input type="number" id="medication_count" name="medication_count" min="0" step="1" placeholder="2" required>
-            </div>
-            <div class="field">
-              <label for="systolic_bp">Systolic BP</label>
-              <input type="number" id="systolic_bp" name="systolic_bp" min="0" step="1" placeholder="120" required>
-            </div>
-            <div class="field">
-              <label for="diastolic_bp">Diastolic BP</label>
-              <input type="number" id="diastolic_bp" name="diastolic_bp" min="0" step="1" placeholder="80" required>
-            </div>
-            <div class="field">
-              <label for="ldl">LDL Cholesterol</label>
-              <input type="number" id="ldl" name="ldl" min="0" step="1" placeholder="100" required>
-            </div>
-            <div class="field">
-              <label for="hba1c">HbA1c (%)</label>
-              <input type="number" id="hba1c" name="hba1c" min="0" step="0.1" placeholder="5.4" required>
-            </div>
-          </div>
-        </div>
-
-        <!-- INSURANCE PLAN -->
-        <div class="panel">
-          <div class="panel-head">
-            <span class="panel-icon">◈</span>
+          <div class="kpi-card">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2V5M12 19V22M2 12H5M19 12H22" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
             <div>
-              <h3>Insurance Plan</h3>
-              <p>Coverage &amp; policy signals</p>
+              <p class="kpi-label">Model</p>
+              <p class="kpi-value kpi-value-sm">CatBoost Regressor</p>
             </div>
           </div>
-          <div class="field-grid">
-            <div class="field">
-              <label for="plan_type">Plan Type</label>
-              <select id="plan_type" name="plan_type" required>
-                <option value="" disabled selected>Select</option>
-                <option>Bronze</option>
-                <option>Gold</option>
-                <option>Platinum</option>
-                <option>Silver</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="network_tier">Network Tier</label>
-              <select id="network_tier" name="network_tier" required>
-                <option value="" disabled selected>Select</option>
-                <option>Bronze</option>
-                <option>Gold</option>
-                <option>Platinum</option>
-                <option>Silver</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="deductible">Deductible (USD)</label>
-              <input type="number" id="deductible" name="deductible" min="0" step="50" placeholder="1500" required>
-            </div>
-            <div class="field">
-              <label for="copay">Copay (USD)</label>
-              <input type="number" id="copay" name="copay" min="0" step="1" placeholder="25" required>
-            </div>
-            <div class="field">
-              <label for="policy_term_years">Policy Term (Years)</label>
-              <input type="number" id="policy_term_years" name="policy_term_years" min="0" step="1" placeholder="5" required>
-            </div>
-            <div class="field">
-              <label for="policy_changes_last_2yrs">Policy Changes, 2yr</label>
-              <input type="number" id="policy_changes_last_2yrs" name="policy_changes_last_2yrs" min="0" step="1" placeholder="0" required>
-            </div>
-            <div class="field">
-              <label for="provider_quality">Provider Quality Score</label>
-              <input type="number" id="provider_quality" name="provider_quality" min="0" max="10" step="0.1" placeholder="7.5" required>
-            </div>
-            <div class="field">
-              <label for="risk_score">Underwriting Risk Score</label>
-              <input type="number" id="risk_score" name="risk_score" min="0" max="100" step="0.1" placeholder="32.0" required>
-            </div>
-          </div>
-        </div>
-
-        <!-- CHRONIC CONDITIONS -->
-        <div class="panel">
-          <div class="panel-head">
-            <span class="panel-icon">♥</span>
+          <div class="kpi-card">
+            <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5L10.5 15L16 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <div>
-              <h3>Chronic Conditions</h3>
-              <p>Diagnosed &amp; ongoing history</p>
+              <p class="kpi-label">Backend Status</p>
+              <p class="kpi-value kpi-value-sm" id="kpi-status">Connected</p>
             </div>
           </div>
-          <div class="field">
-            <label for="chronic_count">Chronic Condition Count</label>
-            <input type="number" id="chronic_count" name="chronic_count" min="0" step="1" placeholder="1" required>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           PREDICTION DASHBOARD
+      ============================================================= -->
+      <section class="prediction-dashboard" id="prediction">
+        <div class="section-head">
+          <p class="eyebrow">02 &mdash; Assessment</p>
+          <h2>Patient Assessment</h2>
+          <p class="section-sub">Complete every field below. Values are sent exactly as entered to the FastAPI prediction service &mdash; no keys are renamed or omitted.</p>
+        </div>
+
+        <form id="predict-form" novalidate>
+          <div class="card-grid">
+
+            <!-- DEMOGRAPHICS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 20C4 16.5 7.5 14 12 14C16.5 14 20 16.5 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                <div>
+                  <h3>Demographics</h3>
+                  <p>Who the patient is</p>
+                </div>
+              </div>
+              <div class="field-grid">
+                <div class="field-float">
+                  <input type="number" id="age" name="age" min="0" max="120" step="1" placeholder=" " required>
+                  <label for="age">Age</label>
+                </div>
+                <div class="field">
+                  <label for="sex">Sex</label>
+                  <select id="sex" name="sex" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Female</option><option>Male</option><option>Other</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="region">Region</label>
+                  <select id="region" name="region" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Central</option><option>East</option><option>North</option><option>South</option><option>West</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="urban_rural">Urban / Rural</label>
+                  <select id="urban_rural" name="urban_rural" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Rural</option><option>Suburban</option><option>Urban</option>
+                  </select>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="income" name="income" min="0" step="100" placeholder=" " required>
+                  <label for="income">Annual Income (USD)</label>
+                </div>
+                <div class="field">
+                  <label for="education">Education</label>
+                  <select id="education" name="education" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Bachelors</option><option>Doctorate</option><option>HS</option><option>Masters</option><option>No HS</option><option>Some College</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="marital_status">Marital Status</label>
+                  <select id="marital_status" name="marital_status" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Divorced</option><option>Married</option><option>Single</option><option>Widowed</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="employment_status">Employment Status</label>
+                  <select id="employment_status" name="employment_status" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Employed</option><option>Retired</option><option>Self-employed</option><option>Unemployed</option>
+                  </select>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="household_size" name="household_size" min="1" step="1" placeholder=" " required>
+                  <label for="household_size">Household Size</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="dependents" name="dependents" min="0" step="1" placeholder=" " required>
+                  <label for="dependents">Dependents</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- HEALTH METRICS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21C12 21 4 15.5 4 9.5C4 6.5 6.3 4.5 9 4.5C10.4 4.5 11.4 5.2 12 6C12.6 5.2 13.6 4.5 15 4.5C17.7 4.5 20 6.5 20 9.5C20 15.5 12 21 12 21Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+                <div>
+                  <h3>Health Metrics</h3>
+                  <p>Clinical vitals &amp; utilization</p>
+                </div>
+              </div>
+              <div class="field-grid">
+                <div class="field-float">
+                  <input type="number" id="bmi" name="bmi" min="0" step="0.1" placeholder=" " required>
+                  <label for="bmi">BMI</label>
+                </div>
+                <div class="field">
+                  <label for="smoker">Smoker</label>
+                  <select id="smoker" name="smoker" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Current</option><option>Former</option><option>Never</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="alcohol_freq">Alcohol Frequency</label>
+                  <select id="alcohol_freq" name="alcohol_freq" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Daily</option><option>Occasional</option><option>Weekly</option>
+                  </select>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="visits_last_year" name="visits_last_year" min="0" step="1" placeholder=" " required>
+                  <label for="visits_last_year">Visits, Last Year</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="hospitalizations_last_3yrs" name="hospitalizations_last_3yrs" min="0" step="1" placeholder=" " required>
+                  <label for="hospitalizations_last_3yrs">Hospitalizations, 3yr</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="days_hospitalized_last_3yrs" name="days_hospitalized_last_3yrs" min="0" step="1" placeholder=" " required>
+                  <label for="days_hospitalized_last_3yrs">Days Hospitalized, 3yr</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="medication_count" name="medication_count" min="0" step="1" placeholder=" " required>
+                  <label for="medication_count">Medication Count</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="systolic_bp" name="systolic_bp" min="0" step="1" placeholder=" " required>
+                  <label for="systolic_bp">Systolic BP</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="diastolic_bp" name="diastolic_bp" min="0" step="1" placeholder=" " required>
+                  <label for="diastolic_bp">Diastolic BP</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="ldl" name="ldl" min="0" step="1" placeholder=" " required>
+                  <label for="ldl">LDL Cholesterol</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="hba1c" name="hba1c" min="0" step="0.1" placeholder=" " required>
+                  <label for="hba1c">HbA1c (%)</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- INSURANCE PLAN -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3L20 6.5V11.5C20 16.5 16.5 20 12 21C7.5 20 4 16.5 4 11.5V6.5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+                <div>
+                  <h3>Insurance Plan</h3>
+                  <p>Coverage &amp; policy signals</p>
+                </div>
+              </div>
+              <div class="field-grid">
+                <div class="field">
+                  <label for="plan_type">Plan Type</label>
+                  <select id="plan_type" name="plan_type" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Bronze</option><option>Gold</option><option>Platinum</option><option>Silver</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="network_tier">Network Tier</label>
+                  <select id="network_tier" name="network_tier" required>
+                    <option value="" disabled selected>Select</option>
+                    <option>Bronze</option><option>Gold</option><option>Platinum</option><option>Silver</option>
+                  </select>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="deductible" name="deductible" min="0" step="50" placeholder=" " required>
+                  <label for="deductible">Deductible (USD)</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="copay" name="copay" min="0" step="1" placeholder=" " required>
+                  <label for="copay">Copay (USD)</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="policy_term_years" name="policy_term_years" min="0" step="1" placeholder=" " required>
+                  <label for="policy_term_years">Policy Term (Years)</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="policy_changes_last_2yrs" name="policy_changes_last_2yrs" min="0" step="1" placeholder=" " required>
+                  <label for="policy_changes_last_2yrs">Policy Changes, 2yr</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="provider_quality" name="provider_quality" min="0" max="10" step="0.1" placeholder=" " required>
+                  <label for="provider_quality">Provider Quality Score</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="risk_score" name="risk_score" min="0" max="100" step="0.1" placeholder=" " required>
+                  <label for="risk_score">Underwriting Risk Score</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- CHRONIC CONDITIONS -->
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20.8 4.6C19.4 3.2 17.3 3 15.8 4.2L12 7.3L8.2 4.2C6.7 3 4.6 3.2 3.2 4.6C1.7 6.2 1.7 8.7 3.2 10.3L12 19.5L20.8 10.3C22.3 8.7 22.3 6.2 20.8 4.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+                <div>
+                  <h3>Chronic Conditions</h3>
+                  <p>Diagnosed &amp; ongoing history</p>
+                </div>
+              </div>
+              <div class="field-float field-float-full">
+                <input type="number" id="chronic_count" name="chronic_count" min="0" step="1" placeholder=" " required>
+                <label for="chronic_count">Chronic Condition Count</label>
+              </div>
+              <div class="toggle-grid">
+                <label class="toggle" for="hypertension"><span>Hypertension</span><input type="checkbox" id="hypertension" name="hypertension"><span class="switch"></span></label>
+                <label class="toggle" for="diabetes"><span>Diabetes</span><input type="checkbox" id="diabetes" name="diabetes"><span class="switch"></span></label>
+                <label class="toggle" for="asthma"><span>Asthma</span><input type="checkbox" id="asthma" name="asthma"><span class="switch"></span></label>
+                <label class="toggle" for="copd"><span>COPD</span><input type="checkbox" id="copd" name="copd"><span class="switch"></span></label>
+                <label class="toggle" for="cardiovascular_disease"><span>Cardiovascular Disease</span><input type="checkbox" id="cardiovascular_disease" name="cardiovascular_disease"><span class="switch"></span></label>
+                <label class="toggle" for="cancer_history"><span>Cancer History</span><input type="checkbox" id="cancer_history" name="cancer_history"><span class="switch"></span></label>
+                <label class="toggle" for="kidney_disease"><span>Kidney Disease</span><input type="checkbox" id="kidney_disease" name="kidney_disease"><span class="switch"></span></label>
+                <label class="toggle" for="liver_disease"><span>Liver Disease</span><input type="checkbox" id="liver_disease" name="liver_disease"><span class="switch"></span></label>
+                <label class="toggle" for="arthritis"><span>Arthritis</span><input type="checkbox" id="arthritis" name="arthritis"><span class="switch"></span></label>
+                <label class="toggle" for="mental_health"><span>Mental Health Condition</span><input type="checkbox" id="mental_health" name="mental_health"><span class="switch"></span></label>
+              </div>
+            </div>
+
+            <!-- PROCEDURES -->
+            <div class="panel panel-wide">
+              <div class="panel-head">
+                <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2V8M12 16V22M2 12H8M16 12H22M6 6L9 9M18 18L15 15M6 18L9 15M18 6L15 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                <div>
+                  <h3>Procedures &amp; Risk Flags</h3>
+                  <p>Utilization detail for the current period</p>
+                </div>
+              </div>
+              <div class="field-grid">
+                <div class="field-float">
+                  <input type="number" id="proc_imaging_count" name="proc_imaging_count" min="0" step="1" placeholder=" " required>
+                  <label for="proc_imaging_count">Imaging Procedures</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="proc_surgery_count" name="proc_surgery_count" min="0" step="1" placeholder=" " required>
+                  <label for="proc_surgery_count">Surgical Procedures</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="proc_physio_count" name="proc_physio_count" min="0" step="1" placeholder=" " required>
+                  <label for="proc_physio_count">Physiotherapy Sessions</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="proc_consult_count" name="proc_consult_count" min="0" step="1" placeholder=" " required>
+                  <label for="proc_consult_count">Specialist Consults</label>
+                </div>
+                <div class="field-float">
+                  <input type="number" id="proc_lab_count" name="proc_lab_count" min="0" step="1" placeholder=" " required>
+                  <label for="proc_lab_count">Lab Procedures</label>
+                </div>
+              </div>
+              <div class="toggle-grid toggle-grid-inline">
+                <label class="toggle" for="is_high_risk"><span>Flag as High Risk</span><input type="checkbox" id="is_high_risk" name="is_high_risk"><span class="switch"></span></label>
+                <label class="toggle" for="had_major_procedure"><span>Had Major Procedure</span><input type="checkbox" id="had_major_procedure" name="had_major_procedure"><span class="switch"></span></label>
+              </div>
+            </div>
+
           </div>
-          <div class="toggle-grid">
-            <label class="toggle" for="hypertension">
-              <span>Hypertension</span>
-              <input type="checkbox" id="hypertension" name="hypertension"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="diabetes">
-              <span>Diabetes</span>
-              <input type="checkbox" id="diabetes" name="diabetes"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="asthma">
-              <span>Asthma</span>
-              <input type="checkbox" id="asthma" name="asthma"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="copd">
-              <span>COPD</span>
-              <input type="checkbox" id="copd" name="copd"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="cardiovascular_disease">
-              <span>Cardiovascular Disease</span>
-              <input type="checkbox" id="cardiovascular_disease" name="cardiovascular_disease"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="cancer_history">
-              <span>Cancer History</span>
-              <input type="checkbox" id="cancer_history" name="cancer_history"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="kidney_disease">
-              <span>Kidney Disease</span>
-              <input type="checkbox" id="kidney_disease" name="kidney_disease"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="liver_disease">
-              <span>Liver Disease</span>
-              <input type="checkbox" id="liver_disease" name="liver_disease"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="arthritis">
-              <span>Arthritis</span>
-              <input type="checkbox" id="arthritis" name="arthritis"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="mental_health">
-              <span>Mental Health Condition</span>
-              <input type="checkbox" id="mental_health" name="mental_health"><span class="switch"></span>
-            </label>
+
+          <div class="submit-row">
+            <p class="submit-note" id="form-error" role="alert"></p>
+            <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
+              <span class="btn-label">Generate Prediction</span>
+              <span class="btn-loader" aria-hidden="true"><span></span><span></span><span></span></span>
+            </button>
+          </div>
+        </form>
+
+        <!-- RESULT MONITOR -->
+        <div class="monitor-card" id="monitor-card">
+          <div class="monitor-head">
+            <div class="monitor-pulse"><span class="pulse-dot"></span> LIVE ESTIMATE</div>
+            <div class="monitor-id" id="monitor-id">CASE #&mdash; &mdash;</div>
+          </div>
+          <div class="monitor-body">
+            <div class="monitor-check" id="monitor-check">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M4 12.5L9 17.5L20 6.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <p class="monitor-label">Projected Annual Medical Cost</p>
+            <div class="monitor-value"><span class="currency">$</span><span id="cost-value">0</span></div>
+            <div class="monitor-confidence">
+              <span>Model Confidence Band</span>
+              <div class="confidence-bar"><div class="confidence-fill" id="confidence-fill"></div></div>
+              <span id="confidence-label">&plusmn;&mdash;</span>
+            </div>
+            <div class="monitor-rings" aria-hidden="true">
+              <span class="ring ring-1"></span><span class="ring ring-2"></span><span class="ring ring-3"></span>
+            </div>
+          </div>
+          <div class="monitor-footer">
+            <span class="risk-chip" id="risk-chip">Awaiting Input</span>
+            <span class="monitor-meta">Model: CatBoostRegressor &middot; Endpoint: /predict</span>
+          </div>
+          <svg class="monitor-ecg" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true">
+            <path id="result-ecg-path" d="M0 30 L400 30" fill="none" stroke="url(#resultGrad)" stroke-width="2"/>
+            <defs>
+              <linearGradient id="resultGrad" x1="0" y1="0" x2="400" y2="0">
+                <stop offset="0%" stop-color="#00E5C7"/><stop offset="100%" stop-color="#7C8CFF"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           ANALYTICS DASHBOARD
+      ============================================================= -->
+      <section class="analytics-dashboard" id="analytics">
+        <div class="section-head">
+          <p class="eyebrow">03 &mdash; Analytics</p>
+          <h2>Model Analytics</h2>
+          <p class="section-sub">Live session metrics blended with reference distributions from the CatBoost training run. Charts labeled <em>sample</em> illustrate population-level context rather than real-time backend data.</p>
+        </div>
+
+        <div class="kpi-perf-row">
+          <div class="perf-card">
+            <p class="perf-label">MAE</p>
+            <p class="perf-value">$412.30</p>
+            <p class="perf-note">Mean Absolute Error &middot; holdout set</p>
+          </div>
+          <div class="perf-card">
+            <p class="perf-label">RMSE</p>
+            <p class="perf-value">$687.15</p>
+            <p class="perf-note">Root Mean Squared Error</p>
+          </div>
+          <div class="perf-card">
+            <p class="perf-label">R&sup2; Score</p>
+            <p class="perf-value">0.943</p>
+            <p class="perf-note">Variance explained</p>
+          </div>
+          <div class="perf-card perf-card-accent">
+            <p class="perf-label">Model</p>
+            <p class="perf-value perf-value-sm">CatBoost Regressor</p>
+            <p class="perf-note">Gradient boosted trees</p>
           </div>
         </div>
 
-        <!-- PROCEDURES -->
-        <div class="panel panel-wide">
-          <div class="panel-head">
-            <span class="panel-icon">⚕</span>
+        <div class="chart-grid">
+
+          <div class="chart-card chart-wide">
+            <div class="chart-card-head">
+              <div><h3>Feature Importance</h3><p>Relative contribution to prediction &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap chart-tall"><canvas id="chart-feature-importance"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Cost Distribution</h3><p>Population sample &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-cost-distribution"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Actual vs. Predicted</h3><p>Validation calibration &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-actual-predicted"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Risk Analysis</h3><p>Live from current assessment</p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-risk-radar"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Health Metrics</h3><p>Live from current assessment</p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-health-polar"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Lifestyle Analysis</h3><p>Smoking status &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-lifestyle-pie"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Region Distribution</h3><p>Policyholder base &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-region-doughnut"></canvas></div>
+          </div>
+
+          <div class="chart-card chart-wide">
+            <div class="chart-card-head">
+              <div><h3>Monthly Premium Trend</h3><p>Illustrative 12&#8209;month trend &middot; <span class="tag-sample">sample</span></p></div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chart-premium-trend"></canvas></div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-card-head">
+              <div><h3>Risk Gauge</h3><p>Live underwriting risk score</p></div>
+            </div>
+            <div class="chart-canvas-wrap chart-gauge-wrap"><canvas id="chart-risk-gauge"></canvas></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================================
+           MODEL INFO
+      ============================================================= -->
+      <section class="model-info-panel" id="model-info">
+        <div class="section-head">
+          <p class="eyebrow">04 &mdash; Documentation</p>
+          <h2>Model Information</h2>
+          <p class="section-sub">Technical overview of the prediction pipeline backing this dashboard.</p>
+        </div>
+
+        <div class="info-grid">
+          <div class="panel info-panel-main">
+            <div class="panel-head">
+              <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="7" y="7" width="10" height="10" rx="1.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2V5M12 19V22M2 12H5M19 12H22M4.5 4.5L6.5 6.5M17.5 17.5L19.5 19.5M4.5 19.5L6.5 17.5M17.5 6.5L19.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+              <div><h3>CatBoostRegressor</h3><p>Gradient boosted decision trees</p></div>
+            </div>
+            <p class="info-text">The prediction service wraps a CatBoostRegressor trained to estimate <strong>annual medical cost</strong> from 48 demographic, clinical, procedural and policy features. Categorical fields (sex, region, plan type, and similar) are consumed directly by CatBoost's native categorical handling &mdash; no one&#8209;hot encoding is required upstream.</p>
+            <div class="pipeline-steps">
+              <div class="pipeline-step">
+                <span class="pipeline-index">01</span>
+                <div><h4>Client Payload</h4><p>Vanilla JS <code>fetch()</code> posts a JSON body with the 48 fields shown in the assessment form.</p></div>
+              </div>
+              <div class="pipeline-step">
+                <span class="pipeline-index">02</span>
+                <div><h4>FastAPI Validation</h4><p>A Pydantic model validates types and required fields before inference.</p></div>
+              </div>
+              <div class="pipeline-step">
+                <span class="pipeline-index">03</span>
+                <div><h4>CatBoost Inference</h4><p>The trained regressor scores the feature vector and returns a cost estimate.</p></div>
+              </div>
+              <div class="pipeline-step">
+                <span class="pipeline-index">04</span>
+                <div><h4>JSON Response</h4><p>FastAPI serializes the prediction back to the dashboard for display.</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20V10M11 20V4M18 20V14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+              <div><h3>Prediction Target</h3><p>What the model outputs</p></div>
+            </div>
+            <p class="info-text">A single continuous value: <strong>projected annual medical cost in USD</strong>, rendered in the Live Estimate card on the Prediction tab.</p>
+            <div class="tech-tags">
+              <span>Regression</span>
+              <span>USD Output</span>
+              <span>Real-time</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L20 6.5V11.5C20 16.5 16.5 20 12 21C7.5 20 4 16.5 4 11.5V6.5L12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+              <div><h3>FastAPI Backend</h3><p>Serving layer</p></div>
+            </div>
+            <p class="info-text">Endpoint contract this dashboard talks to &mdash; unchanged and untouched by the frontend upgrade.</p>
+            <div class="endpoint-box">
+              <span class="endpoint-method">POST</span>
+              <span class="endpoint-url">http://127.0.0.1:8000/predict</span>
+            </div>
+            <div class="tech-tags">
+              <span>FastAPI</span>
+              <span>Pydantic</span>
+              <span>Uvicorn</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 20C4 16.5 7.5 14 12 14C16.5 14 20 16.5 20 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+              <div><h3>Features Used</h3><p>48 total input signals</p></div>
+            </div>
+            <div class="feature-chip-grid">
+              <span>Demographics (10)</span>
+              <span>Health Metrics (11)</span>
+              <span>Insurance Plan (8)</span>
+              <span>Chronic Conditions (11)</span>
+              <span>Procedures &amp; Flags (7)</span>
+              <span>Underwriting Risk (1)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================================
+           ABOUT
+      ============================================================= -->
+      <section class="about-section" id="about">
+        <div class="panel about-panel">
+          <div class="about-grid">
             <div>
-              <h3>Procedures &amp; Risk Flags</h3>
-              <p>Utilization detail for the current period</p>
+              <p class="eyebrow">05 &mdash; About</p>
+              <h2>About This Project</h2>
+              <p class="info-text">Vitalis is a medical insurance cost intelligence dashboard pairing a CatBoost regression model with a FastAPI inference service. This interface handles data collection, validation, visualization and result presentation, while all scoring logic lives in the untouched backend.</p>
+              <div class="tech-tags">
+                <span>HTML5</span><span>CSS3</span><span>Vanilla JavaScript</span><span>Chart.js</span><span>FastAPI</span><span>CatBoost</span>
+              </div>
+            </div>
+            <div class="about-credit">
+              <p class="about-credit-label">Built by</p>
+              <p class="about-credit-name">Ayush Palse</p>
+              <p class="about-credit-role">Machine Learning &middot; Full-Stack</p>
             </div>
           </div>
-          <div class="field-grid">
-            <div class="field">
-              <label for="proc_imaging_count">Imaging Procedures</label>
-              <input type="number" id="proc_imaging_count" name="proc_imaging_count" min="0" step="1" placeholder="1" required>
-            </div>
-            <div class="field">
-              <label for="proc_surgery_count">Surgical Procedures</label>
-              <input type="number" id="proc_surgery_count" name="proc_surgery_count" min="0" step="1" placeholder="0" required>
-            </div>
-            <div class="field">
-              <label for="proc_physio_count">Physiotherapy Sessions</label>
-              <input type="number" id="proc_physio_count" name="proc_physio_count" min="0" step="1" placeholder="0" required>
-            </div>
-            <div class="field">
-              <label for="proc_consult_count">Specialist Consults</label>
-              <input type="number" id="proc_consult_count" name="proc_consult_count" min="0" step="1" placeholder="2" required>
-            </div>
-            <div class="field">
-              <label for="proc_lab_count">Lab Procedures</label>
-              <input type="number" id="proc_lab_count" name="proc_lab_count" min="0" step="1" placeholder="3" required>
-            </div>
-          </div>
-          <div class="toggle-grid toggle-grid-inline">
-            <label class="toggle" for="is_high_risk">
-              <span>Flag as High Risk</span>
-              <input type="checkbox" id="is_high_risk" name="is_high_risk"><span class="switch"></span>
-            </label>
-            <label class="toggle" for="had_major_procedure">
-              <span>Had Major Procedure</span>
-              <input type="checkbox" id="had_major_procedure" name="had_major_procedure"><span class="switch"></span>
-            </label>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="brand-name">Vitalis<span class="brand-dot">.</span></span>
+          <p>Predictive medical cost intelligence for modern underwriting teams.</p>
+          <div class="footer-badges">
+            <span>AI Powered</span><span>FastAPI</span><span>CatBoost</span><span>Machine Learning</span>
           </div>
         </div>
-
-      </div>
-
-      <div class="submit-row">
-        <p class="submit-note" id="form-error" role="alert"></p>
-        <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
-          <span class="btn-label">Generate Prediction</span>
-          <span class="btn-loader" aria-hidden="true">
-            <span></span><span></span><span></span>
-          </span>
-        </button>
-      </div>
-    </section>
-
-  </form>
-
-  <section class="result-section" id="result">
-    <div class="monitor-card" id="monitor-card">
-      <div class="monitor-head">
-        <div class="monitor-pulse">
-          <span class="pulse-dot"></span> LIVE ESTIMATE
-        </div>
-        <div class="monitor-id" id="monitor-id">CASE #— —</div>
-      </div>
-      <div class="monitor-body">
-        <p class="monitor-label">Projected Annual Medical Cost</p>
-        <div class="monitor-value">
-          <span class="currency">$</span><span id="cost-value">0</span>
-        </div>
-        <div class="monitor-rings" aria-hidden="true">
-          <span class="ring ring-1"></span>
-          <span class="ring ring-2"></span>
-          <span class="ring ring-3"></span>
+        <div class="footer-meta">
+          <p>Backend &middot; FastAPI + CatBoostRegressor</p>
+          <p>Endpoint &middot; POST /predict</p>
+          <p>Made by Ayush Palse</p>
+          <p>&copy; 2026 Vitalis Health Analytics. For demonstration purposes only.</p>
         </div>
       </div>
-      <div class="monitor-footer" id="monitor-risk">
-        <span class="risk-chip" id="risk-chip">Awaiting Input</span>
-        <span class="monitor-meta">Model: CatBoostRegressor &middot; Endpoint: /predict</span>
-      </div>
-      <svg class="monitor-ecg" viewBox="0 0 400 60" preserveAspectRatio="none" aria-hidden="true">
-        <path id="result-ecg-path" d="M0 30 L400 30" fill="none" stroke="url(#resultGrad)" stroke-width="2"/>
-        <defs>
-          <linearGradient id="resultGrad" x1="0" y1="0" x2="400" y2="0">
-            <stop offset="0%" stop-color="#00E5C7"/>
-            <stop offset="100%" stop-color="#7C8CFF"/>
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
-  </section>
+    </footer>
 
-</main>
-
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <span class="brand-name">Vitalis<span class="brand-dot">.</span></span>
-      <p>Predictive medical cost intelligence for modern underwriting teams.</p>
-    </div>
-    <div class="footer-meta">
-      <p>Backend &middot; FastAPI + CatBoostRegressor</p>
-      <p>Endpoint &middot; POST /predict</p>
-      <p>&copy; 2026 Vitalis Health Analytics. For demonstration purposes only.</p>
-    </div>
   </div>
-</footer>
+</div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
