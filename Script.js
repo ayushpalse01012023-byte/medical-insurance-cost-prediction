@@ -2,7 +2,7 @@
 // VITALIS — Enterprise Dashboard Client
 // =========================================================
 
-const API_URL = "http://127.0.0.1:8000/predict";
+const API_URL = "https://medical-insurance-cost-prediction-t0d6.onrender.com/predict";
 
 /* ---------------------------------------------------------
    Field maps — identical to the FastAPI Pydantic model.
