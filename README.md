@@ -7,7 +7,7 @@ An end-to-end Machine Learning web application that predicts annual medical insu
 
 ## 📌 Project Overview
 
-**Medical Insurance Cost Prediction** is a complete ML-powered web application designed to estimate an individual's annual medical insurance expenses based on personal and lifestyle attributes such as age, BMI, smoking status, and region.
+**Medical Insurance Cost Prediction** is a complete ML-powered web application designed to estimate an individual's annual medical insurance expenses based on personal and lifestyle attributes such as age, BMI, smoking status,
 
 The project integrates:
 
