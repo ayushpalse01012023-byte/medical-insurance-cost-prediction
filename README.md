@@ -1,7 +1,7 @@
 # 🏥 Medical Insurance Cost Prediction
 
 
-An end-to-end Machine Learning web application that predicts annual medical insurance costs using a trained **CatBoost Regressor** model, served through a **FastAPI** backend and consumed by an interactive, dark-themed dashboard.
+An end-to-end Machine Learning web application that predicts annual medical insurance costs using a trained **CatBoost Regressor** model, served through a **FastAPI** backend and consumed by an interactive, 
 
 ---
 
