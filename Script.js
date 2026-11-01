@@ -2,11 +2,29 @@
 // VITALIS — Enterprise Dashboard Client
 // =========================================================
 
-const API_URL = "https://medical-insurance-cost-prediction-t0d6.onrender.com/predict";
+/* ---------------------------------------------------------
+   API configuration — the ONLY place backend URLs are defined.
+   Local development: run `uvicorn main:app --reload` (port 8000)
+   and open this page through Live Server (http://127.0.0.1:5500).
+   For a deployed backend, change API_BASE_URL only.
+--------------------------------------------------------- */
+const API_BASE_URL = "http://127.0.0.1:8000";
+const ENDPOINTS = {
+  predict: `${API_BASE_URL}/predict`,
+  recommend: `${API_BASE_URL}/recommend-plans`,
+  health: `${API_BASE_URL}/health`
+};
+const REQUEST_TIMEOUT_MS = 30000;
+const HEALTH_TIMEOUT_MS = 5000;
+
+const SIMULATED_DISCLAIMER =
+  "Insurance plans and company information are simulated for academic demonstration only. " +
+  "Cost calculations are estimates based on simplified assumptions and are not actual insurance quotations.";
 
 /* ---------------------------------------------------------
-   Field maps — identical to the FastAPI Pydantic model.
-   Do not rename, camelCase, or omit any key here.
+   Field maps — identical to the FastAPI Pydantic model
+   (InsuranceInput, extra="forbid"). Do not rename, camelCase,
+   or omit any key here.
 --------------------------------------------------------- */
 const NUMBER_FIELDS = [
   "age", "income", "household_size", "dependents",
@@ -19,6 +37,18 @@ const NUMBER_FIELDS = [
   "proc_imaging_count", "proc_surgery_count", "proc_physio_count",
   "proc_consult_count", "proc_lab_count"
 ];
+
+// Fields declared as `int` in the backend schema: decimals would be rejected (HTTP 422).
+const INTEGER_FIELDS = new Set([
+  "age", "household_size", "dependents", "visits_last_year",
+  "hospitalizations_last_3yrs", "days_hospitalized_last_3yrs", "medication_count",
+  "deductible", "copay", "policy_term_years", "policy_changes_last_2yrs",
+  "chronic_count", "proc_imaging_count", "proc_surgery_count",
+  "proc_physio_count", "proc_consult_count", "proc_lab_count"
+]);
+
+// Fields the backend requires to be strictly greater than zero.
+const POSITIVE_FIELDS = new Set(["bmi", "systolic_bp", "diastolic_bp"]);
 
 const SELECT_FIELDS = [
   "sex", "region", "urban_rural", "education", "marital_status",
@@ -58,21 +88,43 @@ function buildPayload() {
   return payload;
 }
 
+/**
+ * Returns { missing: [fieldNames], invalid: [{ field, reason }] }.
+ */
 function validatePayload(payload) {
   const missing = [];
+  const invalid = [];
+
   NUMBER_FIELDS.forEach((field) => {
-    if (payload[field] === null || Number.isNaN(payload[field])) missing.push(field);
+    const value = payload[field];
+    if (value === null || !Number.isFinite(value)) {
+      missing.push(field);
+      return;
+    }
+    const el = document.getElementById(field);
+    if (INTEGER_FIELDS.has(field) && !Number.isInteger(value)) {
+      invalid.push({ field, reason: "must be a whole number" });
+    } else if (POSITIVE_FIELDS.has(field) && value <= 0) {
+      invalid.push({ field, reason: "must be greater than 0" });
+    } else if (el.min !== "" && value < Number(el.min)) {
+      invalid.push({ field, reason: `must be at least ${el.min}` });
+    } else if (el.max !== "" && value > Number(el.max)) {
+      invalid.push({ field, reason: `must be at most ${el.max}` });
+    }
   });
+
   SELECT_FIELDS.forEach((field) => {
     if (!payload[field]) missing.push(field);
   });
-  return missing;
+
+  return { missing, invalid };
 }
 
 function extractCost(data) {
   if (typeof data === "number") return data;
   if (data && typeof data === "object") {
     const candidates = [
+      "predicted_annual_medical_cost", // current backend response key
       "prediction", "predicted_cost", "predicted_annual_cost",
       "cost", "annual_medical_cost", "result", "value"
     ];
@@ -86,10 +138,81 @@ function extractCost(data) {
 }
 
 /* ---------------------------------------------------------
+   Network layer — one place for timeouts and error messages
+--------------------------------------------------------- */
+class ApiError extends Error {
+  constructor(message, kind, status) {
+    super(message);
+    this.name = "ApiError";
+    this.kind = kind;     // "network" | "timeout" | "http" | "parse" | "empty"
+    this.status = status;
+  }
+}
+
+function formatDetail(detail) {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        const loc = Array.isArray(item.loc) ? item.loc.filter((p) => p !== "body").join(".") : "";
+        return loc ? `${loc}: ${item.msg}` : (item.msg || JSON.stringify(item));
+      })
+      .join("; ");
+  }
+  return JSON.stringify(detail);
+}
+
+function jsonPost(body) {
+  return {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  };
+}
+
+async function requestJson(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+
+  try {
+    response = await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err && err.name === "AbortError") {
+      throw new ApiError("The backend took too long to respond. Please try again.", "timeout");
+    }
+    setApiStatus("offline");
+    throw new ApiError(
+      `Could not reach the Vitalis backend at ${API_BASE_URL}. ` +
+      "Make sure FastAPI is running (uvicorn main:app --reload) and that this page is opened through Live Server.",
+      "network"
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    let detail = `Request failed with status ${response.status}.`;
+    try {
+      const errBody = await response.json();
+      if (errBody && errBody.detail) detail = formatDetail(errBody.detail);
+    } catch (_) { /* no JSON body */ }
+    throw new ApiError(detail, "http", response.status);
+  }
+
+  try {
+    return await response.json();
+  } catch (_) {
+    throw new ApiError("The backend returned a response that is not valid JSON.", "parse");
+  }
+}
+
+/* ---------------------------------------------------------
    DOM references
 --------------------------------------------------------- */
 const form = document.getElementById("predict-form");
 const submitBtn = document.getElementById("submit-btn");
+const retryPredictBtn = document.getElementById("retry-predict-btn");
 const errorNote = document.getElementById("form-error");
 
 const monitorCard = document.getElementById("monitor-card");
@@ -102,9 +225,24 @@ const confidenceLabel = document.getElementById("confidence-label");
 
 const kpiCount = document.getElementById("kpi-count");
 const kpiAvg = document.getElementById("kpi-avg");
+const kpiStatus = document.getElementById("kpi-status");
 const miniCount = document.getElementById("mini-count");
 const miniAvg = document.getElementById("mini-avg");
 const orbitLatency = document.getElementById("orbit-latency");
+const statusPill = document.getElementById("status-pill");
+const statusText = document.getElementById("status-text");
+
+const recoSection = document.getElementById("reco-section");
+const recoContext = document.getElementById("reco-context");
+const recoLoading = document.getElementById("reco-loading");
+const recoError = document.getElementById("reco-error");
+const recoErrorText = document.getElementById("reco-error-text");
+const recoRetryBtn = document.getElementById("reco-retry-btn");
+const recoGrid = document.getElementById("reco-grid");
+const recoFootnote = document.getElementById("reco-footnote");
+const recoDataStatus = document.getElementById("reco-data-status");
+const recoDisclaimer = document.getElementById("reco-disclaimer");
+const recoAssumptions = document.getElementById("reco-assumptions");
 
 /* ---------------------------------------------------------
    Session stats (client-side only — real usage, not fabricated)
@@ -118,6 +256,29 @@ function refreshSessionStats() {
   const avgText = avg !== null ? `$${avg.toLocaleString("en-US")}` : "—";
   kpiAvg.textContent = avg !== null ? avgText : "—";
   miniAvg.textContent = avg !== null ? avgText : "$0";
+}
+
+/* ---------------------------------------------------------
+   Backend status (driven by GET /health and request outcomes)
+--------------------------------------------------------- */
+function setApiStatus(state) {
+  statusPill.classList.toggle("is-offline", state === "offline");
+  statusPill.classList.toggle("is-checking", state === "checking");
+  const labels = { online: "API Connected", offline: "API Offline", checking: "Checking API…" };
+  const kpiLabels = { online: "Connected", offline: "Offline", checking: "Checking…" };
+  statusText.textContent = labels[state];
+  kpiStatus.textContent = kpiLabels[state];
+}
+
+async function checkBackendHealth() {
+  setApiStatus("checking");
+  try {
+    const health = await requestJson(ENDPOINTS.health, {}, HEALTH_TIMEOUT_MS);
+    const ready = health && health.status === "ok" && health.model_loaded === true;
+    setApiStatus(ready ? "online" : "offline");
+  } catch (_) {
+    setApiStatus("offline");
+  }
 }
 
 /* ---------------------------------------------------------
@@ -161,9 +322,14 @@ sections.forEach((section) => spyObserver.observe(section));
 /* ---------------------------------------------------------
    Loading / error UI
 --------------------------------------------------------- */
-function setLoading(isLoading) {
-  submitBtn.classList.toggle("is-loading", isLoading);
-  submitBtn.disabled = isLoading;
+let isBusy = false; // true while a predict or recommendation request is in flight
+
+function setBusy(busy) {
+  isBusy = busy;
+  submitBtn.classList.toggle("is-loading", busy);
+  submitBtn.disabled = busy;
+  retryPredictBtn.disabled = busy;
+  recoRetryBtn.disabled = busy;
 }
 function showFormError(message) {
   errorNote.textContent = message;
@@ -201,6 +367,34 @@ function animateResultEcg(intensity) {
     d += `L ${x + 8} ${midY} L ${x + 14} ${spikeUp} L ${x + 20} ${spikeDown} L ${nextX} ${midY} `;
   }
   resultEcgPath.setAttribute("d", d);
+}
+
+/** Returns the live-estimate card to its idle state so a failed run never shows an older result. */
+function resetMonitor() {
+  monitorCard.classList.remove("is-active");
+  costValueEl.textContent = "0";
+  monitorId.textContent = "CASE #\u2014 \u2014";
+  riskChip.textContent = "Awaiting Input";
+  riskChip.className = "risk-chip";
+  confidenceFill.style.width = "0%";
+  confidenceLabel.textContent = "\u00B1\u2014";
+  resultEcgPath.setAttribute("d", "M0 30 L400 30");
+}
+
+function showPrediction(payload, cost) {
+  monitorCard.classList.add("is-active");
+  monitorId.textContent = `CASE #${Math.floor(100000 + Math.random() * 900000)}`;
+  animateCount(Math.round(cost));
+
+  const risk = riskLabel(payload, cost);
+  riskChip.textContent = risk.text;
+  riskChip.className = `risk-chip ${risk.cls}`;
+
+  const confidencePct = Math.max(58, 100 - Math.min(42, Math.round(payload.risk_score * 0.4)));
+  confidenceFill.style.width = `${confidencePct}%`;
+  confidenceLabel.textContent = `±${(100 - confidencePct + 4)}% estimated variance`;
+
+  animateResultEcg(Math.min(cost / 25000, 1));
 }
 
 /* ---------------------------------------------------------
@@ -582,65 +776,262 @@ function updateLiveCharts(payload) {
 }
 
 /* ---------------------------------------------------------
+   Insurance plan recommendations (POST /recommend-plans)
+--------------------------------------------------------- */
+let lastPrediction = null; // { cost, visits } of the most recent successful prediction
+let requestSeq = 0;        // guards against late responses from an older run
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined && text !== null) node.textContent = text;
+  return node;
+}
+
+function toNum(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtUsd(value, maxDigits = 0) {
+  const n = toNum(value);
+  if (n === null) return "—";
+  return n.toLocaleString("en-US", {
+    style: "currency", currency: "USD",
+    minimumFractionDigits: 0, maximumFractionDigits: maxDigits
+  });
+}
+
+function fmtPercent(value) {
+  const n = toNum(value);
+  if (n === null) return "—";
+  return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+}
+
+function fmtText(value) {
+  return value === null || value === undefined || value === "" ? "—" : String(value);
+}
+
+function setRecoState(state) {
+  recoSection.hidden = state === "idle";
+  recoLoading.hidden = state !== "loading";
+  recoError.hidden = state !== "error";
+  recoGrid.hidden = state !== "ready";
+  recoFootnote.hidden = state !== "ready";
+}
+
+function resetRecommendations() {
+  recoGrid.replaceChildren();
+  recoAssumptions.replaceChildren();
+  recoContext.textContent = "";
+  recoErrorText.textContent = "";
+  setRecoState("idle");
+}
+
+function buildPlanCard(plan, index) {
+  const rank = toNum(plan.rank) ?? index + 1;
+  const card = el("article", `reco-card reco-card-enter${rank === 1 ? " is-top" : ""}`);
+  card.style.setProperty("--i", String(index));
+  card.setAttribute("aria-label", `Rank ${rank}: ${fmtText(plan.plan_name)}`);
+
+  const top = el("div", "reco-card-top");
+  top.appendChild(el("span", "reco-rank", `#${rank}`));
+  if (rank === 1) top.appendChild(el("span", "reco-top-tag", "Top match"));
+  card.appendChild(top);
+
+  const header = el("div");
+  header.appendChild(el("p", "reco-company", fmtText(plan.company_name).trim()));
+  header.appendChild(el("h4", "reco-plan", fmtText(plan.plan_name)));
+  const chips = el("div", "reco-chips");
+  chips.appendChild(el("span", "reco-chip", fmtText(plan.plan_type)));
+  chips.appendChild(el("span", "reco-chip", fmtText(plan.network_tier)));
+  header.appendChild(chips);
+  card.appendChild(header);
+
+  const total = el("div", "reco-total");
+  total.appendChild(el("p", "reco-total-label", "Estimated total annual cost"));
+  const totalValue = el("p", "reco-total-value", fmtUsd(plan.estimated_total_annual_cost));
+  totalValue.appendChild(el("small", null, "premium + cost-sharing"));
+  total.appendChild(totalValue);
+  card.appendChild(total);
+
+  const score = toNum(plan.match_score);
+  if (score !== null) {
+    const scoreBox = el("div", "reco-score");
+    const row = el("div", "reco-score-row");
+    row.appendChild(el("span", null, "Match score"));
+    row.appendChild(el("strong", null, `${score.toFixed(1)} / 100`));
+    scoreBox.appendChild(row);
+    const bar = el("div", "reco-score-bar");
+    const fill = el("div", "reco-score-fill");
+    fill.dataset.width = `${Math.max(0, Math.min(100, score))}%`;
+    bar.appendChild(fill);
+    scoreBox.appendChild(bar);
+    card.appendChild(scoreBox);
+  }
+
+  const stats = [
+    ["Annual premium", fmtUsd(plan.annual_premium)],
+    ["Monthly premium", fmtUsd(plan.monthly_premium, 2)],
+    ["Deductible", fmtUsd(plan.deductible)],
+    ["Copay per visit", fmtUsd(plan.copay)],
+    ["Coinsurance", fmtPercent(plan.coinsurance_percentage)],
+    ["Out-of-pocket max", fmtUsd(plan.out_of_pocket_maximum)],
+    ["Est. member cost-sharing", fmtUsd(plan.estimated_member_cost_sharing)],
+    ["Worst-case annual cost", fmtUsd(plan.worst_case_annual_cost), true]
+  ];
+  const dl = el("dl", "reco-stats");
+  stats.forEach(([label, value, warn]) => {
+    const item = el("div", `reco-stat${warn ? " is-warn" : ""}`);
+    item.appendChild(el("dt", null, label));
+    item.appendChild(el("dd", null, value));
+    dl.appendChild(item);
+  });
+  card.appendChild(dl);
+
+  if (plan.coverage_description) {
+    card.appendChild(el("p", "reco-desc", String(plan.coverage_description)));
+  }
+
+  // The current backend does not return a suitability field; this renders only if one is added later.
+  const fit = plan.suitable_for || plan.suitability_note || plan.suitability_notes;
+  if (fit) {
+    const fitBox = el("p", "reco-fit");
+    fitBox.appendChild(el("strong", null, "Suited for: "));
+    fitBox.appendChild(document.createTextNode(String(fit)));
+    card.appendChild(fitBox);
+  }
+
+  return card;
+}
+
+function renderRecommendations(data, cost) {
+  const plans = Array.isArray(data && data.recommended_plans)
+    ? data.recommended_plans.filter((p) => p && typeof p === "object")
+    : [];
+
+  if (plans.length === 0) {
+    throw new ApiError("The backend did not return any matching insurance plans.", "empty");
+  }
+
+  const shownCost = toNum(data.predicted_annual_medical_cost) ?? cost;
+  const evaluated = toNum(data.plans_evaluated);
+  recoContext.textContent =
+    `Compared against your predicted annual medical cost of ${fmtUsd(shownCost)}` +
+    (evaluated !== null ? ` across ${evaluated} simulated plans.` : ".") +
+    " Plans are ranked by a match score, not by price alone.";
+
+  recoGrid.replaceChildren(...plans.map(buildPlanCard));
+
+  recoDataStatus.textContent = fmtText(data.data_status || "Simulated - Academic Demonstration Only");
+  recoDisclaimer.textContent = data.disclaimer || SIMULATED_DISCLAIMER;
+
+  recoAssumptions.replaceChildren();
+  const assumptions = Array.isArray(data.calculation_assumptions) ? data.calculation_assumptions : [];
+  assumptions.forEach((text) => recoAssumptions.appendChild(el("li", null, String(text))));
+
+  setRecoState("ready");
+
+  // Animate score bars after the cards are in the DOM.
+  requestAnimationFrame(() => {
+    recoGrid.querySelectorAll(".reco-score-fill").forEach((fill) => {
+      fill.style.width = fill.dataset.width;
+    });
+  });
+}
+
+/**
+ * Fetches and renders plan suggestions. Never throws: failures are shown
+ * inside the recommendation section so the prediction stays visible.
+ */
+async function loadRecommendations(cost, visits, seq) {
+  recoContext.textContent = "";
+  recoGrid.replaceChildren();
+  setRecoState("loading");
+
+  try {
+    // The backend requires a non-negative cost; a regression model can occasionally output a tiny negative value.
+    const requestBody = {
+      predicted_annual_medical_cost: Math.max(0, Math.round(cost * 100) / 100),
+      visits_last_year: visits
+    };
+    const data = await requestJson(ENDPOINTS.recommend, jsonPost(requestBody));
+    if (seq !== requestSeq) return; // a newer run started; ignore this response
+    renderRecommendations(data, cost);
+  } catch (err) {
+    if (seq !== requestSeq) return;
+    recoGrid.replaceChildren();
+    recoErrorText.textContent = err.message || "Unexpected error while loading plan suggestions.";
+    setRecoState("error");
+  }
+}
+
+recoRetryBtn.addEventListener("click", async () => {
+  if (isBusy || !lastPrediction) return;
+  setBusy(true);
+  const seq = ++requestSeq;
+  try {
+    await loadRecommendations(lastPrediction.cost, lastPrediction.visits, seq);
+  } finally {
+    setBusy(false);
+  }
+});
+
+retryPredictBtn.addEventListener("click", () => {
+  if (isBusy) return;
+  if (typeof form.requestSubmit === "function") {
+    form.requestSubmit();
+  } else {
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  }
+});
+
+/* ---------------------------------------------------------
    Prediction submit handler
 --------------------------------------------------------- */
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isBusy) return;
+
   showFormError("");
+  retryPredictBtn.hidden = true;
 
   const payload = buildPayload();
-  const missing = validatePayload(payload);
+  const { missing, invalid } = validatePayload(payload);
 
-  if (missing.length > 0) {
-    showFormError(`Please complete: ${missing.join(", ")}`);
-    document.getElementById(missing[0]).focus();
+  if (missing.length > 0 || invalid.length > 0) {
+    const parts = [];
+    if (missing.length > 0) parts.push(`Please complete: ${missing.join(", ")}`);
+    if (invalid.length > 0) parts.push(`Please correct: ${invalid.map((i) => `${i.field} ${i.reason}`).join("; ")}`);
+    showFormError(parts.join(". "));
+    const firstField = missing[0] || invalid[0].field;
+    document.getElementById(firstField).focus();
     return;
   }
 
-  setLoading(true);
-  const t0 = performance.now();
+  // New run: clear anything left over from a previous prediction.
+  const seq = ++requestSeq;
+  lastPrediction = null;
+  resetMonitor();
+  resetRecommendations();
+  setBusy(true);
+
+  let cost = null;
 
   try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const t0 = performance.now();
+    const data = await requestJson(ENDPOINTS.predict, jsonPost(payload));
+    if (orbitLatency) orbitLatency.textContent = `${Math.round(performance.now() - t0)}ms`;
+    setApiStatus("online");
 
-    const elapsed = Math.round(performance.now() - t0);
-    if (orbitLatency) orbitLatency.textContent = `${elapsed}ms`;
-
-    if (!response.ok) {
-      let detail = `Request failed with status ${response.status}.`;
-      try {
-        const errBody = await response.json();
-        if (errBody && errBody.detail) {
-          detail = typeof errBody.detail === "string" ? errBody.detail : JSON.stringify(errBody.detail);
-        }
-      } catch (_) { /* no JSON body */ }
-      throw new Error(detail);
+    cost = extractCost(data);
+    if (cost === null || !Number.isFinite(cost)) {
+      throw new ApiError("The prediction service returned an unexpected response shape.", "parse");
     }
 
-    const data = await response.json();
-    const cost = extractCost(data);
+    showPrediction(payload, cost);
 
-    if (cost === null) {
-      throw new Error("The prediction service returned an unexpected response shape.");
-    }
-
-    monitorCard.classList.add("is-active");
-    monitorId.textContent = `CASE #${Math.floor(100000 + Math.random() * 900000)}`;
-    animateCount(Math.round(cost));
-
-    const risk = riskLabel(payload, cost);
-    riskChip.textContent = risk.text;
-    riskChip.className = `risk-chip ${risk.cls}`;
-
-    const confidencePct = Math.max(58, 100 - Math.min(42, Math.round(payload.risk_score * 0.4)));
-    confidenceFill.style.width = `${confidencePct}%`;
-    confidenceLabel.textContent = `±${(100 - confidencePct + 4)}% estimated variance`;
-
-    animateResultEcg(Math.min(cost / 25000, 1));
     try {
       updateLiveCharts(payload);
     } catch (chartErr) {
@@ -651,16 +1042,20 @@ form.addEventListener("submit", async (event) => {
     session.total += cost;
     refreshSessionStats();
 
-    document.getElementById("prediction").scrollIntoView({ behavior: "smooth", block: "start" });
-
+    monitorCard.scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (err) {
-    showFormError(
-      err.message.includes("Failed to fetch")
-        ? "Could not reach the prediction service at 127.0.0.1:8000. Confirm the FastAPI backend is running."
-        : err.message
-    );
+    showFormError(err.message);
+    retryPredictBtn.hidden = false;
+    setBusy(false);
+    return;
+  }
+
+  // Stage 2: insurance plan suggestions. Failures here do not hide the prediction.
+  lastPrediction = { cost, visits: payload.visits_last_year };
+  try {
+    await loadRecommendations(cost, payload.visits_last_year, seq);
   } finally {
-    setLoading(false);
+    setBusy(false);
   }
 });
 
@@ -689,7 +1084,15 @@ function tryInitCharts() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Show endpoint URLs from the single ENDPOINTS constant.
+  document.querySelectorAll("[data-endpoint]").forEach((node) => {
+    const url = ENDPOINTS[node.dataset.endpoint];
+    if (url) node.textContent = url;
+  });
+
   refreshSessionStats();
+  checkBackendHealth();
+
   if (!tryInitCharts()) {
     // Give the fallback CDN (loaded async in index.html) a moment to arrive.
     window.addEventListener("chartjs-ready", () => tryInitCharts());
