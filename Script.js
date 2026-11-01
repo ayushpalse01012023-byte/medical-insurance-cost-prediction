@@ -8,7 +8,7 @@
    and open this page through Live Server (http://127.0.0.1:5500).
    For a deployed backend, change API_BASE_URL only.
 --------------------------------------------------------- */
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = "https://medical-insurance-cost-prediction-t0d6.onrender.com";
 const ENDPOINTS = {
   predict: `${API_BASE_URL}/predict`,
   recommend: `${API_BASE_URL}/recommend-plans`,
