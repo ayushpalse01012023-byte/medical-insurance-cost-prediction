@@ -1,33 +1,33 @@
 """
-Vitalis AI - Medical Cost Prediction & Insurance Plan Recommendation API
+Vitalis AI - Medical Cost Prediction and Insurance Plan Recommendation API
 
-Required files in the same folder:
-    api.py
+Required files:
+    main.py
     medical_insurance_model.pkl
     feature_columns.pkl
     insurance_companies.csv
 
 Run:
-    uvicorn api:app --reload
+    uvicorn main:app --reload
 """
 
-import os
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Optional, Literal
+from typing import Literal, Optional
 
 import joblib
 import numpy as np
 import pandas as pd
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 
 
-# ============================================================
+# =========================================================
 # CONFIGURATION
-# ============================================================
+# =========================================================
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("vitalis_ai")
@@ -38,19 +38,14 @@ MODEL_PATH = BASE_DIR / "medical_insurance_model.pkl"
 FEATURE_COLUMNS_PATH = BASE_DIR / "feature_columns.pkl"
 INSURANCE_CSV_PATH = BASE_DIR / "insurance_companies.csv"
 
+ALCOHOL_FREQ_MODE_FALLBACK = "Occasional"
 NUM_RECOMMENDATIONS = 3
 
-DEFAULT_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "https://voluble-rugelach-ed09f4.netlify.app",
-]
-
 DISCLAIMER = (
-    "SIMULATED DATA - ACADEMIC DEMONSTRATION ONLY. Insurance companies, "
-    "plans and premiums in this dataset are fictional. Medical cost "
-    "predictions are estimates and plan recommendations use simplified "
-    "assumptions. They are not financial or insurance advice."
+    "Insurance plans and company information are simulated "
+    "for academic demonstration only. Cost calculations are "
+    "estimates based on simplified assumptions and are not "
+    "actual insurance quotations."
 )
 
 REQUIRED_PLAN_COLUMNS = [
@@ -68,18 +63,26 @@ REQUIRED_PLAN_COLUMNS = [
 ]
 
 
-# ============================================================
-# REQUEST MODEL
-# ============================================================
+# =========================================================
+# GLOBAL VARIABLES
+# =========================================================
+
+model = None
+feature_columns = None
+insurance_plans = None
+
+
+# =========================================================
+# INPUT SCHEMA
+# =========================================================
 
 class InsuranceInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
 
+    # Demographics
     age: int = Field(..., ge=0, le=120)
     sex: Literal["Female", "Male", "Other"]
     region: Literal["Central", "East", "North", "South", "West"]
     urban_rural: Literal["Rural", "Suburban", "Urban"]
-
     income: float = Field(..., ge=0)
     education: Literal[
         "Bachelors", "Doctorate", "HS",
@@ -91,10 +94,10 @@ class InsuranceInput(BaseModel):
     employment_status: Literal[
         "Employed", "Retired", "Self-employed", "Unemployed"
     ]
-
     household_size: int = Field(..., ge=0)
     dependents: int = Field(..., ge=0)
 
+    # Health and lifestyle
     bmi: float = Field(..., gt=0)
     smoker: Literal["Current", "Former", "Never"]
     alcohol_freq: Optional[
@@ -111,6 +114,7 @@ class InsuranceInput(BaseModel):
     ldl: float = Field(..., ge=0)
     hba1c: float = Field(..., ge=0)
 
+    # Insurance details used by the trained model
     plan_type: Literal["Bronze", "Gold", "Platinum", "Silver"]
     network_tier: Literal["Bronze", "Gold", "Platinum", "Silver"]
 
@@ -122,8 +126,8 @@ class InsuranceInput(BaseModel):
     provider_quality: float
     risk_score: float
 
+    # Chronic conditions
     chronic_count: int = Field(..., ge=0)
-
     hypertension: int = Field(..., ge=0, le=1)
     diabetes: int = Field(..., ge=0, le=1)
     asthma: int = Field(..., ge=0, le=1)
@@ -135,81 +139,68 @@ class InsuranceInput(BaseModel):
     arthritis: int = Field(..., ge=0, le=1)
     mental_health: int = Field(..., ge=0, le=1)
 
+    # Procedure counts
     proc_imaging_count: int = Field(..., ge=0)
     proc_surgery_count: int = Field(..., ge=0)
     proc_physio_count: int = Field(..., ge=0)
     proc_consult_count: int = Field(..., ge=0)
     proc_lab_count: int = Field(..., ge=0)
 
+    # Risk flags
     is_high_risk: int = Field(..., ge=0, le=1)
     had_major_procedure: int = Field(..., ge=0, le=1)
 
+    class Config:
+        extra = "forbid"
+
+
+class PredictionResponse(BaseModel):
+    predicted_annual_medical_cost: float
+
 
 class PlanRecommendationRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    predicted_annual_medical_cost: float
-    visits_last_year: Optional[int] = Field(default=4, ge=0)
+    predicted_annual_medical_cost: float = Field(..., ge=0)
+    visits_last_year: int = Field(default=4, ge=0)
 
 
-# ============================================================
-# GLOBAL VARIABLES
-# ============================================================
+# =========================================================
+# PREPROCESSING
+# PRESERVES ORIGINAL TRAINING PREPROCESSING LOGIC
+# =========================================================
 
-model = None
-feature_columns = None
-insurance_plans = None
-
-
-# ============================================================
-# MODEL PREPROCESSING
-# ============================================================
-
-def preprocess_input(payload: InsuranceInput):
+def preprocess_input(payload: InsuranceInput) -> pd.DataFrame:
 
     if feature_columns is None:
         raise RuntimeError("Feature columns are not loaded.")
 
-    data = payload.model_dump()
+    input_dict = payload.dict()
+    df = pd.DataFrame([input_dict])
 
-    if data["alcohol_freq"] is None:
-        data["alcohol_freq"] = "Occasional"
+    # Fill missing alcohol frequency using training mode.
+    if df["alcohol_freq"].isnull().any():
+        df["alcohol_freq"] = df["alcohol_freq"].fillna(
+            ALCOHOL_FREQ_MODE_FALLBACK
+        )
 
-    categorical_columns = [
-        "sex",
-        "region",
-        "urban_rural",
-        "education",
-        "marital_status",
-        "employment_status",
-        "smoker",
-        "alcohol_freq",
-        "plan_type",
-        "network_tier",
-    ]
+    # Same encoding method as original backend.
+    df = pd.get_dummies(df, drop_first=True)
 
-    df = pd.DataFrame([data])
+    # Convert boolean columns into integers.
+    bool_cols = df.select_dtypes(include="bool").columns
+    df[bool_cols] = df[bool_cols].astype(int)
 
-    # This assumes training used pandas get_dummies.
-    df = pd.get_dummies(
-        df,
-        columns=categorical_columns,
-        drop_first=False,
-        dtype=int,
-    )
-
-    # Match the exact saved training feature order.
+    # Match exact training feature names and order.
     df = df.reindex(
         columns=feature_columns,
-        fill_value=0,
+        fill_value=0
     )
 
     return df
 
 
-# ============================================================
+# =========================================================
 # LOAD INSURANCE DATASET
-# ============================================================
+# =========================================================
 
 def load_insurance_data():
 
@@ -227,7 +218,8 @@ def load_insurance_data():
 
     if missing_columns:
         raise ValueError(
-            f"Missing insurance CSV columns: {missing_columns}"
+            "Missing columns in insurance_companies.csv: "
+            + ", ".join(missing_columns)
         )
 
     numeric_columns = [
@@ -236,41 +228,33 @@ def load_insurance_data():
         "deductible",
         "copay",
         "coinsurance_percentage",
-        "out_of_pocket_maximum",
+        "out_of_pocket_maximum"
     ]
 
     for col in numeric_columns:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df = df.dropna(
-        subset=REQUIRED_PLAN_COLUMNS
-    ).copy()
+    df = df.dropna(subset=REQUIRED_PLAN_COLUMNS).copy()
 
     if df.empty:
         raise ValueError("No valid insurance plans found.")
 
     for col in numeric_columns:
         if (df[col] < 0).any():
-            raise ValueError(
-                f"Negative values found in {col}."
-            )
+            raise ValueError(f"Invalid negative values in {col}.")
 
     if (df["coinsurance_percentage"] > 100).any():
-        raise ValueError(
-            "Coinsurance percentage cannot exceed 100."
-        )
+        raise ValueError("Coinsurance cannot exceed 100 percent.")
 
     if "data_status" not in df.columns:
-        df["data_status"] = (
-            "Simulated - Academic Demonstration Only"
-        )
+        df["data_status"] = "Simulated - Academic Demonstration Only"
 
     return df.reset_index(drop=True)
 
 
-# ============================================================
-# INSURANCE PLAN COST CALCULATION
-# ============================================================
+# =========================================================
+# INSURANCE COST CALCULATION
+# =========================================================
 
 def calculate_plan_cost(plan, predicted_cost, visits):
 
@@ -286,62 +270,61 @@ def calculate_plan_cost(plan, predicted_cost, visits):
         plan["out_of_pocket_maximum"]
     )
 
-    # Estimate annual copay expenses.
+    # Estimated annual copay expenses.
     copay_total = copay * visits
 
-    # Remaining medical spending after estimated copays.
+    # Remaining medical expenses.
     remaining_cost = max(
         predicted_cost - copay_total,
-        0,
+        0
     )
 
-    # Apply deductible.
+    # Deductible payment.
     deductible_payment = min(
         remaining_cost,
-        deductible,
+        deductible
     )
 
     remaining_after_deductible = max(
         remaining_cost - deductible,
-        0,
+        0
     )
 
-    # Apply coinsurance.
+    # Coinsurance payment.
     coinsurance_payment = (
         remaining_after_deductible * coinsurance
     )
 
-    estimated_member_cost = (
+    # Estimated member expenses.
+    member_cost = (
         copay_total
         + deductible_payment
         + coinsurance_payment
     )
 
-    # Academic assumption: all cost sharing counts toward
-    # one annual out-of-pocket maximum.
-    estimated_member_cost = min(
-        estimated_member_cost,
-        out_of_pocket_max,
+    # Simplified academic assumption:
+    # all cost-sharing expenses count toward one OOP maximum.
+    member_cost = min(
+        member_cost,
+        out_of_pocket_max
     )
 
-    estimated_total_cost = (
-        annual_premium + estimated_member_cost
-    )
+    total_annual_cost = annual_premium + member_cost
 
     worst_case_cost = (
         annual_premium + out_of_pocket_max
     )
 
     return {
-        "estimated_member_cost_sharing": estimated_member_cost,
-        "estimated_total_annual_cost": estimated_total_cost,
-        "worst_case_annual_cost": worst_case_cost,
+        "estimated_member_cost_sharing": member_cost,
+        "estimated_total_annual_cost": total_annual_cost,
+        "worst_case_annual_cost": worst_case_cost
     }
 
 
-# ============================================================
-# INSURANCE PLAN RANKING
-# ============================================================
+# =========================================================
+# RANK INSURANCE PLANS
+# =========================================================
 
 def rank_insurance_plans(predicted_cost, visits):
 
@@ -351,58 +334,43 @@ def rank_insurance_plans(predicted_cost, visits):
         lambda row: calculate_plan_cost(
             row,
             predicted_cost,
-            visits,
+            visits
         ),
-        axis=1,
+        axis=1
     )
 
     calculated_df = pd.DataFrame(
         calculations.tolist(),
-        index=df.index,
+        index=df.index
     )
 
-    df = pd.concat(
-        [df, calculated_df],
-        axis=1,
-    )
+    df = pd.concat([df, calculated_df], axis=1)
 
-    # Lower total estimated annual cost gets a higher score.
-    minimum_cost = df[
-        "estimated_total_annual_cost"
-    ].min()
+    # Lower total estimated cost = higher score.
+    min_cost = df["estimated_total_annual_cost"].min()
+    max_cost = df["estimated_total_annual_cost"].max()
 
-    maximum_cost = df[
-        "estimated_total_annual_cost"
-    ].max()
-
-    if maximum_cost == minimum_cost:
+    if max_cost == min_cost:
         df["cost_score"] = 100
     else:
         df["cost_score"] = (
-            100
-            * (maximum_cost - df["estimated_total_annual_cost"])
-            / (maximum_cost - minimum_cost)
+            100 * (max_cost - df["estimated_total_annual_cost"])
+            / (max_cost - min_cost)
         )
 
-    # Lower worst-case annual cost gets a higher score.
-    minimum_worst = df[
-        "worst_case_annual_cost"
-    ].min()
+    # Lower worst-case cost = higher protection score.
+    min_worst = df["worst_case_annual_cost"].min()
+    max_worst = df["worst_case_annual_cost"].max()
 
-    maximum_worst = df[
-        "worst_case_annual_cost"
-    ].max()
-
-    if maximum_worst == minimum_worst:
+    if max_worst == min_worst:
         df["protection_score"] = 100
     else:
         df["protection_score"] = (
-            100
-            * (maximum_worst - df["worst_case_annual_cost"])
-            / (maximum_worst - minimum_worst)
+            100 * (max_worst - df["worst_case_annual_cost"])
+            / (max_worst - min_worst)
         )
 
-    # Network tier scoring.
+    # Network tier score.
     network_scores = {
         "platinum": 100,
         "gold": 75,
@@ -410,7 +378,7 @@ def rank_insurance_plans(predicted_cost, visits):
         "bronze": 25,
         "tier 1": 100,
         "tier 2": 75,
-        "tier 3": 50,
+        "tier 3": 50
     }
 
     df["network_score"] = (
@@ -420,10 +388,8 @@ def rank_insurance_plans(predicted_cost, visits):
         .map(network_scores)
     )
 
-    # If network labels cannot be interpreted, do not
-    # pretend they have a known ranking.
     if df["network_score"].isna().any():
-        df["network_score"] = 0
+        # Do not assume an unknown network tier ranking.
         df["match_score"] = (
             df["cost_score"] * 0.70
             + df["protection_score"] * 0.30
@@ -438,103 +404,63 @@ def rank_insurance_plans(predicted_cost, visits):
     df = df.sort_values(
         by=[
             "match_score",
-            "estimated_total_annual_cost",
+            "estimated_total_annual_cost"
         ],
-        ascending=[False, True],
+        ascending=[False, True]
     )
 
     return df.reset_index(drop=True)
 
 
-# ============================================================
-# STARTUP
-# ============================================================
+# =========================================================
+# APPLICATION STARTUP
+# =========================================================
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 
-    global model
-    global feature_columns
-    global insurance_plans
-
-    required_files = [
-        MODEL_PATH,
-        FEATURE_COLUMNS_PATH,
-        INSURANCE_CSV_PATH,
-    ]
-
-    missing_files = [
-        str(path)
-        for path in required_files
-        if not path.exists()
-    ]
-
-    if missing_files:
-        raise RuntimeError(
-            "Required files are missing:\n"
-            + "\n".join(missing_files)
-        )
+    global model, feature_columns, insurance_plans
 
     try:
+        logger.info("Loading CatBoost model...")
+
         model = joblib.load(MODEL_PATH)
 
-        feature_columns = joblib.load(
-            FEATURE_COLUMNS_PATH
-        )
+        logger.info("Loading feature columns...")
 
-        if not isinstance(
-            feature_columns,
-            (list, tuple, pd.Index),
-        ):
+        feature_columns = joblib.load(FEATURE_COLUMNS_PATH)
+
+        if not isinstance(feature_columns, (list, tuple, pd.Index)):
             raise ValueError(
-                "feature_columns.pkl must contain a list of feature names."
+                "feature_columns.pkl must contain feature names."
             )
 
-        feature_columns = [
-            str(col) for col in feature_columns
-        ]
+        feature_columns = list(feature_columns)
 
         if not feature_columns:
-            raise ValueError(
-                "Saved feature columns are empty."
-            )
+            raise ValueError("Feature columns are empty.")
 
-        if len(feature_columns) != len(set(feature_columns)):
-            raise ValueError(
-                "Duplicate feature names found."
-            )
+        logger.info("Loading insurance companies dataset...")
 
         insurance_plans = load_insurance_data()
 
-        if not hasattr(model, "predict"):
-            raise ValueError(
-                "Loaded model does not support predict()."
-            )
-
         logger.info("Vitalis AI backend loaded successfully.")
-        logger.info(
-            "Model features: %s",
-            len(feature_columns),
-        )
-        logger.info(
-            "Insurance plans: %s",
-            len(insurance_plans),
-        )
+
+        logger.info("Model features: %s", len(feature_columns))
+        logger.info("Insurance plans: %s", len(insurance_plans))
 
     except Exception as exc:
         logger.exception("Backend startup failed.")
-        raise RuntimeError(
-            f"Could not load Vitalis AI resources: {exc}"
-        ) from exc
+        raise RuntimeError(str(exc)) from exc
 
     yield
 
-    logger.info("Vitalis AI backend stopped.")
+    logger.info("Vitalis AI backend shut down.")
 
 
-# ============================================================
-# FASTAPI APPLICATION
-# ============================================================
+# =========================================================
+# FASTAPI INITIALIZATION
+# =========================================================
 
 app = FastAPI(
     title="Vitalis AI",
@@ -543,114 +469,92 @@ app = FastAPI(
         "Plan Recommendation System"
     ),
     version="2.0.0",
-    lifespan=lifespan,
+    lifespan=lifespan
 )
 
 
-# ============================================================
-# CORS CONFIGURATION
-# ============================================================
-
-allowed_origins = list(DEFAULT_ALLOWED_ORIGINS)
-
-extra_origins = os.getenv(
-    "FRONTEND_ORIGINS",
-    "",
-)
-
-for origin in extra_origins.split(","):
-    origin = origin.strip().rstrip("/")
-
-    if origin and origin not in allowed_origins:
-        allowed_origins.append(origin)
+# =========================================================
+# CORS
+# =========================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "https://voluble-rugelach-ed09f4.netlify.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 
-# ============================================================
+# =========================================================
 # ROOT ENDPOINT
-# ============================================================
+# =========================================================
 
 @app.get("/")
-def root():
+def read_root():
 
     return {
-        "message": "Vitalis AI API is running.",
-        "documentation": "/docs",
-        "health": "/health",
+        "message": "Welcome to Vitalis AI API.",
+        "prediction_endpoint": "/predict",
+        "recommendation_endpoint": "/recommend-plans",
+        "health_endpoint": "/health",
+        "documentation": "/docs"
     }
 
 
-# ============================================================
-# HEALTH CHECK ENDPOINT
-# ============================================================
+# =========================================================
+# HEALTH CHECK
+# =========================================================
 
 @app.get("/health")
 def health():
 
-    ready = (
-        model is not None
-        and feature_columns is not None
-        and insurance_plans is not None
-    )
-
     return {
-        "status": "ok" if ready else "not_ready",
+        "status": "ok",
         "model_loaded": model is not None,
         "feature_count": (
             len(feature_columns)
-            if feature_columns is not None
-            else 0
+            if feature_columns is not None else 0
         ),
         "insurance_plans_loaded": (
             len(insurance_plans)
-            if insurance_plans is not None
-            else 0
-        ),
+            if insurance_plans is not None else 0
+        )
     }
 
 
-# ============================================================
-# MEDICAL COST PREDICTION ENDPOINT
-# ============================================================
+# =========================================================
+# MEDICAL COST PREDICTION
+# =========================================================
 
-@app.post("/predict")
-def predict_medical_cost(payload: InsuranceInput):
+@app.post("/predict", response_model=PredictionResponse)
+def predict(payload: InsuranceInput):
 
-    if model is None:
+    if model is None or feature_columns is None:
         raise HTTPException(
             status_code=503,
-            detail="Prediction model is not loaded.",
+            detail="Prediction model is not loaded."
         )
 
     try:
-        input_data = preprocess_input(payload)
+        processed_df = preprocess_input(payload)
 
-        prediction = model.predict(input_data)
+        prediction = model.predict(processed_df)
 
-        predicted_cost = float(prediction[0])
+        predicted_value = float(prediction[0])
 
-        if not np.isfinite(predicted_cost):
-            raise ValueError(
-                "Model returned an invalid prediction."
+        if not np.isfinite(predicted_value):
+            raise ValueError("Model returned an invalid prediction.")
+
+        return PredictionResponse(
+            predicted_annual_medical_cost=round(
+                predicted_value, 2
             )
-
-        return {
-            "predicted_annual_medical_cost": round(
-                predicted_cost,
-                2,
-            ),
-            "currency": "USD",
-            "message": (
-                "Medical cost prediction generated successfully."
-            ),
-        }
+        )
 
     except HTTPException:
         raise
@@ -660,23 +564,21 @@ def predict_medical_cost(payload: InsuranceInput):
 
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {str(exc)}",
+            detail=f"Prediction failed: {str(exc)}"
         )
 
 
-# ============================================================
-# INSURANCE PLAN RECOMMENDATION ENDPOINT
-# ============================================================
+# =========================================================
+# INSURANCE PLAN RECOMMENDATIONS
+# =========================================================
 
 @app.post("/recommend-plans")
-def recommend_insurance_plans(
-    payload: PlanRecommendationRequest,
-):
+def recommend_plans(payload: PlanRecommendationRequest):
 
     if insurance_plans is None:
         raise HTTPException(
             status_code=503,
-            detail="Insurance dataset is not loaded.",
+            detail="Insurance dataset is not loaded."
         )
 
     try:
@@ -685,60 +587,40 @@ def recommend_insurance_plans(
         )
 
         if not np.isfinite(predicted_cost):
-            raise ValueError(
-                "Predicted cost must be a finite number."
-            )
+            raise ValueError("Invalid predicted medical cost.")
 
-        # Avoid using negative predicted spending for
-        # insurance comparison.
-        comparison_cost = max(predicted_cost, 0)
+        visits = payload.visits_last_year
 
-        visits = (
-            payload.visits_last_year
-            if payload.visits_last_year is not None
-            else 4
+        ranked = rank_insurance_plans(
+            predicted_cost,
+            visits
         )
 
-        ranked_plans = rank_insurance_plans(
-            comparison_cost,
-            visits,
-        )
+        top_plans = ranked.head(NUM_RECOMMENDATIONS)
 
-        recommended_plans = []
-
-        top_plans = ranked_plans.head(
-            NUM_RECOMMENDATIONS
-        )
+        recommendations = []
 
         for rank, (_, plan) in enumerate(
             top_plans.iterrows(),
-            start=1,
+            start=1
         ):
 
-            recommended_plans.append({
+            recommendations.append({
                 "rank": rank,
-
-                "company_name": plan["company_name"],
-                "plan_name": plan["plan_name"],
-                "plan_type": plan["plan_type"],
+                "company_name": str(plan["company_name"]),
+                "plan_name": str(plan["plan_name"]),
+                "plan_type": str(plan["plan_type"]),
 
                 "annual_premium": round(
-                    float(plan["annual_premium"]),
-                    2,
+                    float(plan["annual_premium"]), 2
                 ),
 
                 "monthly_premium": round(
-                    float(plan["monthly_premium"]),
-                    2,
+                    float(plan["monthly_premium"]), 2
                 ),
 
-                "deductible": float(
-                    plan["deductible"]
-                ),
-
-                "copay": float(
-                    plan["copay"]
-                ),
+                "deductible": float(plan["deductible"]),
+                "copay": float(plan["copay"]),
 
                 "coinsurance_percentage": float(
                     plan["coinsurance_percentage"]
@@ -748,82 +630,70 @@ def recommend_insurance_plans(
                     plan["out_of_pocket_maximum"]
                 ),
 
-                "coverage_description": plan[
-                    "coverage_description"
-                ],
+                "coverage_description": str(
+                    plan["coverage_description"]
+                ),
 
-                "network_tier": plan["network_tier"],
+                "network_tier": str(plan["network_tier"]),
 
                 "estimated_member_cost_sharing": round(
-                    float(
-                        plan["estimated_member_cost_sharing"]
-                    ),
-                    2,
+                    float(plan["estimated_member_cost_sharing"]),
+                    2
                 ),
 
                 "estimated_total_annual_cost": round(
-                    float(
-                        plan["estimated_total_annual_cost"]
-                    ),
-                    2,
+                    float(plan["estimated_total_annual_cost"]),
+                    2
                 ),
 
                 "worst_case_annual_cost": round(
-                    float(
-                        plan["worst_case_annual_cost"]
-                    ),
-                    2,
+                    float(plan["worst_case_annual_cost"]),
+                    2
                 ),
 
                 "match_score": round(
-                    float(plan["match_score"]),
-                    2,
+                    float(plan["match_score"]), 2
                 ),
 
-                "data_status": plan["data_status"],
+                "data_status": str(plan["data_status"])
             })
 
         return {
             "predicted_annual_medical_cost": round(
-                predicted_cost,
-                2,
+                predicted_cost, 2
             ),
 
             "currency": "USD",
 
-            "data_status": (
-                "Simulated - Academic Demonstration Only"
-            ),
+            "plans_evaluated": len(insurance_plans),
+
+            "recommended_plans": recommendations,
+
+            "data_status": "Simulated - Academic Demonstration Only",
 
             "disclaimer": DISCLAIMER,
 
-            "plans_evaluated": len(insurance_plans),
-
-            "recommended_plans": recommended_plans,
-
-            "assumptions": [
-                "Medical cost prediction represents estimated annual medical spending.",
+            "calculation_assumptions": [
                 "Annual premium is added to estimated member cost sharing.",
-                "Copays are estimated using the number of annual visits.",
-                "Deductible and coinsurance are applied using a simplified calculation.",
-                "For this demonstration, copays, deductible and coinsurance are assumed to count toward one out-of-pocket maximum.",
-                "Actual insurance policies may use different cost-sharing rules.",
-                "All insurance plans and premiums are simulated for academic demonstration only.",
-            ],
+                "Copay expenses are estimated using annual doctor visits.",
+                "Deductible and coinsurance use a simplified calculation.",
+                "All cost-sharing expenses are assumed to count toward one out-of-pocket maximum.",
+                "Actual insurance policy rules may differ."
+            ]
         }
 
     except HTTPException:
         raise
 
     except Exception as exc:
-        logger.exception(
-            "Insurance recommendation failed."
-        )
+        logger.exception("Insurance recommendation failed.")
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Insurance recommendation failed: "
-                + str(exc)
-            ),
+            detail=f"Recommendation failed: {str(exc)}"
         )
+
+
+# =========================================================
+# END OF VITALIS AI BACKEND
+# =========================================================
