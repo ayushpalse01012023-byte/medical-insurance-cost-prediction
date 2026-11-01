@@ -103,9 +103,9 @@
         <a href="#model-info">Docs</a>
       </nav>
       <div class="topbar-right">
-        <div class="status-pill">
+        <div class="status-pill" id="status-pill">
           <span class="status-dot"></span>
-          API Connected
+          <span id="status-text">Checking API&hellip;</span>
         </div>
         <div class="avatar" title="Ayush Palse">AP</div>
       </div>
@@ -197,7 +197,7 @@
             <div class="kpi-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M8 12.5L10.5 15L16 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
             <div>
               <p class="kpi-label">Backend Status</p>
-              <p class="kpi-value kpi-value-sm" id="kpi-status">Connected</p>
+              <p class="kpi-value kpi-value-sm" id="kpi-status">Checking&hellip;</p>
             </div>
           </div>
         </div>
@@ -469,6 +469,7 @@
 
           <div class="submit-row">
             <p class="submit-note" id="form-error" role="alert"></p>
+            <button type="button" class="btn btn-ghost" id="retry-predict-btn" hidden>Retry prediction</button>
             <button type="submit" class="btn btn-primary btn-large" id="submit-btn">
               <span class="btn-label">Generate Prediction</span>
               <span class="btn-loader" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -509,6 +510,42 @@
               </linearGradient>
             </defs>
           </svg>
+        </div>
+
+        <!-- INSURANCE PLAN RECOMMENDATIONS -->
+        <div class="reco-section" id="reco-section" hidden>
+          <div class="reco-head">
+            <p class="eyebrow">Insurance Matching</p>
+            <h3>Suggested Insurance Plans</h3>
+            <p class="reco-sub" id="reco-context"></p>
+          </div>
+
+          <div class="reco-loading" id="reco-loading" hidden aria-live="polite">
+            <p class="reco-loading-text"><span class="reco-spinner" aria-hidden="true"></span>Comparing simulated plans against your predicted cost&hellip;</p>
+            <div class="reco-grid">
+              <div class="reco-card reco-skeleton"></div>
+              <div class="reco-card reco-skeleton"></div>
+              <div class="reco-card reco-skeleton"></div>
+            </div>
+          </div>
+
+          <div class="reco-error" id="reco-error" hidden role="alert">
+            <p class="reco-error-title">Your prediction is ready, but plan suggestions could not be loaded.</p>
+            <p class="reco-error-text" id="reco-error-text"></p>
+            <button type="button" class="btn btn-ghost" id="reco-retry-btn">Retry plan suggestions</button>
+          </div>
+
+          <div class="reco-grid" id="reco-grid"></div>
+
+          <div class="reco-footnote" id="reco-footnote" hidden>
+            <span class="reco-sim-tag" id="reco-data-status"></span>
+            <p id="reco-disclaimer"></p>
+            <p class="reco-note-small">The predicted medical cost is an estimate of healthcare spending, not an insurance payout. Match score ranks plans relative to one another using estimated cost and worst-case exposure; the lowest-priced plan is not automatically the best fit.</p>
+            <details>
+              <summary>How these estimates are calculated</summary>
+              <ul id="reco-assumptions"></ul>
+            </details>
+          </div>
         </div>
       </section>
 
@@ -647,6 +684,10 @@
                 <span class="pipeline-index">04</span>
                 <div><h4>JSON Response</h4><p>FastAPI serializes the prediction back to the dashboard for display.</p></div>
               </div>
+              <div class="pipeline-step">
+                <span class="pipeline-index">05</span>
+                <div><h4>Plan Matching</h4><p>The predicted cost is sent to <code>/recommend-plans</code>, which ranks simulated insurance plans using simplified cost-sharing assumptions.</p></div>
+              </div>
             </div>
           </div>
 
@@ -668,10 +709,14 @@
               <span class="panel-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L20 6.5V11.5C20 16.5 16.5 20 12 21C7.5 20 4 16.5 4 11.5V6.5L12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
               <div><h3>FastAPI Backend</h3><p>Serving layer</p></div>
             </div>
-            <p class="info-text">Endpoint contract this dashboard talks to &mdash; unchanged and untouched by the frontend upgrade.</p>
+            <p class="info-text">Endpoint contract this dashboard talks to. The base URL is defined once in <code>Script.js</code>.</p>
             <div class="endpoint-box">
               <span class="endpoint-method">POST</span>
-              <span class="endpoint-url">http://127.0.0.1:8000/predict</span>
+              <span class="endpoint-url" data-endpoint="predict">/predict</span>
+            </div>
+            <div class="endpoint-box">
+              <span class="endpoint-method">POST</span>
+              <span class="endpoint-url" data-endpoint="recommend">/recommend-plans</span>
             </div>
             <div class="tech-tags">
               <span>FastAPI</span>
@@ -733,9 +778,9 @@
         </div>
         <div class="footer-meta">
           <p>Backend &middot; FastAPI + CatBoostRegressor</p>
-          <p>Endpoint &middot; POST /predict</p>
+          <p>Endpoints &middot; POST /predict, POST /recommend-plans</p>
           <p>Made by Ayush Palse</p>
-          <p>&copy; 2026 Vitalis Health Analytics. For demonstration purposes only.</p>
+          <p>&copy; 2026 Vitalis Health Analytics. For demonstration purposes only. Insurance plans shown are simulated.</p>
         </div>
       </div>
     </footer>
